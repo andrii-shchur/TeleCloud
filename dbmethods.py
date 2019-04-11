@@ -67,7 +67,6 @@ class Session():
         cursor = self._cursor()
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
         check = cursor.fetchone()
-        print(check)
         if not check:
             with _lock:
                 cursor.execute(

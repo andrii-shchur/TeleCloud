@@ -82,10 +82,10 @@ def password_handler():
 
 
 if __name__ == '__main__':
-    api_id = 475767
-    api_hash = '828bc5637525744b9d0e409edeca5a31'
+    api_id = 576793
+    api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
     # session_file = manage_session()
-    session_file = 'Wirtos_new'
+    session_file = 'test_session'
     client = Client(session_file, device_model=platform.system(), app_version=__version__, api_id=api_id,
                     api_hash=api_hash, test_mode=True)
     client.start()
@@ -103,5 +103,4 @@ if __name__ == '__main__':
             db_session.set_channel(channel.id, channel.access_hash)
             channel_id = db_session.get_channel()
 
-    print('fin')
     client.stop()
