@@ -1,9 +1,9 @@
 from pyrogram import Client, __version__
 from pyrogram.api.functions import channels
-from pyrogram.api.types import InputPeerChannel
-import platform
+from pyrogram.api.types import MessageMediaDocument
 import os
 from dbmethods import Session
+import platform
 
 
 def find_cloud_by_name(input_title):
@@ -12,7 +12,7 @@ def find_cloud_by_name(input_title):
         print('{}/{}'.format(x, total))
         if i.chat.title == input_title:
             if load_db(i.chat.id):
-                return client.resolve_peer(i.chat.id)
+                return db_session.get_channel()
 
 
 def find_cloud_by_backup():
@@ -20,7 +20,7 @@ def find_cloud_by_backup():
     for x, i in enumerate(client.iter_dialogs()):
         print('{}/{}'.format(x, total))
         if load_db(i.chat.id):
-            return client.resolve_peer(i.chat.id)
+            return db_session.get_channel()
 
 
 def create_cloud_channel(input_title):
@@ -43,28 +43,38 @@ def manage_session():
 
 def load_db(chat_id):
     try:
-        for m in client.iter_history(chat_id, limit=10):
+        for x, m in enumerate(client.iter_history(chat_id, limit=11)):
             if m.document:
                 if m.document.file_name.endswith('.tgdb'):
-                    db_file = m.download('temp_db')
-                    db_session.merge_db(db_file)
+                    m.download('temp_db')
+                    db_session.merge_db('temp.db')
                     return db_session.get_channel()
     except:
         return None
 
 
+def upload_callback(client: Client, current, total):
+    pass
+
+
 def upload_file(path):
-    client.send_document(db_session.get_channel(), path)
+    return client.send_document(db_session.get_channel()[0], path, progress=upload_callback).document
 
 
-def check_channel(chat_id):
-    if chat_id is None:
+def save_file(document: MessageMediaDocument.document, tags, to_folder):
+    db_session.add_file(document.file_id, document.file_name, file_tags=tags, folder_name=to_folder)
+
+
+def check_channel(channel_id):
+    if channel_id is None:
         return False
+    chat_id, access_hash = channel_id
     try:
-        return client.send(channels.GetChannels([InputPeerChannel(*chat_id)]))
+
+        a = client.send(channels.GetFullChannel(channel=client.resolve_peer(chat_id)))
+        return a
     except:
         return False
-
 
 def phone_handler():
     pass
@@ -90,9 +100,12 @@ def init_login():
                 channel_id = find_cloud_by_backup()
         if not channel_id:
             channel = create_cloud_channel(input('new channel name: ')).chats[0]
-            db_session.set_channel(channel.id, channel.access_hash)
-            channel_id = db_session.get_channel()
+            db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
 
+        channel_id = db_session.get_channel()
+
+
+    upload_file('.gitignore')
     client.stop()  # on app exit
 
 
@@ -105,8 +118,7 @@ if __name__ == '__main__':
                     app_version=__version__,
                     api_id=api_id,
                     api_hash=api_hash,
-                    test_mode=True)
+                    test_mode=False)
     client.start()
-
     db_session = Session(session_file)
     init_login()

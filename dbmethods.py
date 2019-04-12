@@ -46,8 +46,8 @@ class BaseFolder:
 
 class Session:
     def __init__(self, session_name: str):
-        cursor = self._cursor()
         self.session_name = session_name
+        cursor = self._cursor()
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
         check = cursor.fetchone()
         if not check:
@@ -83,7 +83,7 @@ class Session:
 
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
-        if self._conn is None:
+        if not hasattr(self, '_conn') or self._conn is None:
             self._conn = sqlite3.connect('{}.db'.format(self.session_name), check_same_thread=False)
             self._conn.create_collation('ALLNOCASEIN',
                                         (lambda cell, string: 0 if string.lower() in cell.lower() else -1))
@@ -100,7 +100,7 @@ class Session:
         cursor = self._cursor()
         cursor.execute('SELECT channelId, channelHash FROM Userdata')
         check = cursor.fetchall()
-        return check[0] if check else None
+        return check[0] if check != (None, None) else None
 
     @staticmethod
     def _search_builder(query: Sequence[str]) -> str:
