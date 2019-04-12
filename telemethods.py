@@ -1,11 +1,8 @@
-import string
-from pyrogram import Client, MessageHandler, __version__
+from pyrogram import Client, __version__
 from pyrogram.api.functions import channels
-from pyrogram.api.errors import AuthKeyUnregistered, AuthKeyDuplicated
-from pyrogram.api.types import InputPeerChannel, InputPeerChat, InputPeerUser, InputPeerSelf
+from pyrogram.api.types import InputPeerChannel
 import platform
 import os
-from time import sleep
 from dbmethods import Session
 
 
@@ -38,10 +35,10 @@ def manage_session():
         for x, i in enumerate(sessions, 1):
             print('[{}] {}'.format(x, os.path.splitext(i)[-2]))
         inp = int(input())
-        session_file = sessions[inp - 1] if inp != -1 else input('new session name: ')
+        session_filename = sessions[inp - 1] if inp != -1 else input('new session name: ')
     else:
-        session_file = input('new session name: ')
-    return session_file
+        session_filename = input('new session name: ')
+    return session_filename
 
 
 def load_db(chat_id):
@@ -51,13 +48,13 @@ def load_db(chat_id):
                 if m.document.file_name.endswith('.tgdb'):
                     db_file = m.download('temp_db')
                     db_session.merge_db(db_file)
-                    return channel_id
+                    return db_session.get_channel()
     except:
         return None
 
 
 def upload_file(path):
-    client.send_document(channel_id, path)
+    client.send_document(db_session.get_channel(), path)
 
 
 def check_channel(chat_id):
@@ -81,16 +78,9 @@ def password_handler():
     pass
 
 
-if __name__ == '__main__':
-    api_id = 576793
-    api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
-    # session_file = manage_session()
-    session_file = 'test_session'
-    client = Client(session_file, device_model=platform.system(), app_version=__version__, api_id=api_id,
-                    api_hash=api_hash, test_mode=True)
-    client.start()
-    db_session = Session(session_file)
+def init_login():
     channel_id = db_session.get_channel()
+
     while not check_channel(channel_id):
         channel_id = find_cloud_by_name('TeleCloud')
         if channel_id:
@@ -103,4 +93,20 @@ if __name__ == '__main__':
             db_session.set_channel(channel.id, channel.access_hash)
             channel_id = db_session.get_channel()
 
-    client.stop()
+    client.stop()  # on app exit
+
+
+if __name__ == '__main__':
+    api_id = 576793
+    api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
+    session_file = manage_session()
+    client = Client(session_file,
+                    device_model=platform.system(),
+                    app_version=__version__,
+                    api_id=api_id,
+                    api_hash=api_hash,
+                    test_mode=True)
+    client.start()
+
+    db_session = Session(session_file)
+    init_login()

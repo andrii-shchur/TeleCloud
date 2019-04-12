@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import Sequence
+from typing import List, Sequence, Tuple
 
 CONST_DATABASE_DELIMITER = '\0'
 
@@ -15,19 +15,8 @@ class FileDuplicateError(Exception):
     pass
 
 
-class BaseFolderDummy():
-    def __init__(self, folder_name):
-        self.name = str(folder_name)
-
-    def __repr__(self):
-        return '{}: {}'.format(self.__class__, self.name)
-
-    def __str__(self):
-        return self.name
-
-
-class BaseFile():
-    def __init__(self, file_id: str, file_name: str, file_tags: str, folder_name: str):
+class BaseFile:
+    def __init__(self, file_id: str, file_name: str, file_tags: (str, Sequence[str]), folder_name: str):
         self.file_id = file_id
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
@@ -37,34 +26,28 @@ class BaseFile():
         return '{}: {}<{}> in {}'.format(self.__class__, self.name, ', '.join(self.tags), self.folder)
 
 
-class BaseFileDummy():
-    def __init__(self):
-        pass
-
-    def __str__(self):
-        return str(self.__class__)
-
-
-class BaseFolder(BaseFolderDummy):
+class BaseFolder:
     def __init__(self, folder_name: str, files_array: Sequence):
-        super(BaseFolder, self).__init__(folder_name)
+        self.name = folder_name
         self.storage = [i for i in files_array]
 
     def __iter__(self):
         return iter(self.storage)
 
     def __repr__(self):
-        return '{}: {}[{}]'.format(self.__class__, self.name, ','.join(self.ret()))
+        return '{}: {}{{{}}}'.format(self.__class__, self.name, ','.join([str(f) for f in self.ret()]))
+
+    def __str__(self):
+        return self.name
 
     def ret(self):
         return self.storage.copy()
 
 
-class Session():
-    def __init__(self, session_name):
-        self._conn: sqlite3.Connection = None
-        self.session_name = session_name
+class Session:
+    def __init__(self, session_name: str):
         cursor = self._cursor()
+        self.session_name = session_name
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
         check = cursor.fetchone()
         if not check:
@@ -77,7 +60,9 @@ class Session():
                     channelHash INTEGER 
                 )
                 """)
+
                 cursor.execute('INSERT INTO userData VALUES((?), (?), (?))', (0.1, None, None))
+
                 cursor.execute(
                     """
                 CREATE TABLE IF NOT EXISTS Files(
@@ -96,7 +81,7 @@ class Session():
                 """)
                 self._conn.commit()
 
-    def _cursor(self):
+    def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
         if self._conn is None:
             self._conn = sqlite3.connect('{}.db'.format(self.session_name), check_same_thread=False)
@@ -104,21 +89,21 @@ class Session():
                                         (lambda cell, string: 0 if string.lower() in cell.lower() else -1))
         return self._conn.cursor()
 
-    def set_channel(self, channel_id, access_hash):
+    def set_channel(self, channel_id: int, access_hash: int):
         cursor = self._cursor()
         with _lock:
             cursor.execute('UPDATE Userdata SET channelId = (?), channelHash = (?)',
                            (channel_id, access_hash,))
             self._conn.commit()
 
-    def get_channel(self):
+    def get_channel(self) -> Tuple[int, int]:
         cursor = self._cursor()
         cursor.execute('SELECT channelId, channelHash FROM Userdata')
         check = cursor.fetchall()
         return check[0] if check else None
 
     @staticmethod
-    def search_builder(query: Sequence[str]) -> str:
+    def _search_builder(query: Sequence[str]) -> str:
         builder = []
         c = True
         if len(query) < 1:
@@ -141,44 +126,45 @@ class Session():
         self._conn.commit()
         conn.close()
 
-    def get_folders(self):
+    def get_folders(self) -> List[BaseFolder]:
         cursor = self._cursor()
         cursor.execute('SELECT DISTINCT folderName from Folders')
-        return [BaseFolderDummy(f[0]) for f in cursor.fetchall()]
+        return [self.get_folder(f[0]) for f in cursor.fetchall()]
 
-    def get_folder(self, folder_name: (str, BaseFolderDummy)):
+    def _check_folder_exists(self, folder_name: (str, BaseFolder)) -> bool:
         cursor = self._cursor()
         folder_name = str(folder_name)
         cursor.execute('SELECT DISTINCT folderName from Folders WHERE folderName == (?)', (folder_name,))
         check = cursor.fetchone()
-        return BaseFolderDummy(check[0]) if check else None
+        return True if check else False
 
-    def get_folder_files(self, folder_name: (str, BaseFolderDummy), fetchmany: int = None):
+    def get_folder(self, folder_name: (str, BaseFolder), fetchmany: int = None) -> BaseFolder:
         cursor = self._cursor()
         folder_name = str(folder_name)
         cursor.execute('SELECT * from Files WHERE folderName == (?)', (folder_name,))
-
+        if not self._check_folder_exists(folder_name):
+            raise FolderMissingError
         return BaseFolder(folder_name, [BaseFile(*i) for i in cursor.fetchall()]) if not fetchmany \
             else BaseFolder(folder_name, [BaseFile(*i) for i in cursor.fetchmany(fetchmany)])
 
-    def add_folder(self, folder_name: (str, BaseFolderDummy)):
+    def add_folder(self, folder_name: (str, BaseFolder)):
         cursor = self._cursor()
         folder_name = str(folder_name)
-        check = self.get_folder(folder_name)
+        check = self._check_folder_exists(folder_name)
         if check:
             return False
         cursor.execute('INSERT INTO Folders VALUES(?)', (folder_name,))
         self._conn.commit()
-        return BaseFolder(folder_name, [BaseFileDummy()])
+        return BaseFolder(folder_name, [])
 
-    def get_file(self, file_id):
+    def get_file(self, file_id: int) -> BaseFile:
         cursor = self._cursor()
         cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileId == (?)',
                        (file_id,))
         check = cursor.fetchone()
         return BaseFile(*check) if check else None
 
-    def check_file_exists(self, file_name, folder_name):
+    def _check_file_exists(self, file_name: str, folder_name: (str, BaseFolder)) -> bool:
         folder_name = str(folder_name)
         cursor = self._cursor()
         cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileName == (?) AND folderName == (?)',
@@ -186,13 +172,13 @@ class Session():
         check = cursor.fetchone()
         return check
 
-    def add_file(self, file_id, file_name, file_tags: (list, tuple), folder_name: (str, BaseFolderDummy)):
+    def add_file(self, file_id, file_name, file_tags: (list, tuple), folder_name: (str, BaseFolder)) -> BaseFile:
         cursor = self._cursor()
         folder_name = str(folder_name)
 
-        if not self.get_folder(folder_name):
+        if not self._check_folder_exists(folder_name):
             raise FolderMissingError("Missing folder: '{}'".format(folder_name))
-        if self.check_file_exists(file_name, folder_name):
+        if self._check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
 
         cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?)',
@@ -206,5 +192,7 @@ class Session():
         for i in query:
             search_query.append(i)
             search_query.append(i)
-        cursor.execute(self.search_builder(query), (search_query))
-        return cursor.fetchall()
+        cursor.execute(
+            self._search_builder(query),
+            (*search_query,))
+        return [BaseFile(*f) for f in cursor.fetchall()]
