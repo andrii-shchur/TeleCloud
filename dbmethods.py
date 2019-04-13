@@ -16,7 +16,7 @@ class FileDuplicateError(Exception):
 
 
 class BaseFile:
-    def __init__(self, file_id: str, file_name: str, file_tags: (str, Sequence[str]), folder_name: str):
+    def __init__(self, file_id: str, file_name: str, file_tags: Sequence[str], folder_name: str):
         self.file_id = file_id
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
@@ -57,11 +57,12 @@ class Session:
                 CREATE TABLE IF NOT EXISTS Userdata(
                     versionId INTEGER,
                     channelId INTEGER,
-                    channelHash INTEGER 
+                    channelHash INTEGER,
+                    lastBackupMsgId INTEGER 
                 )
                 """)
 
-                cursor.execute('INSERT INTO userData VALUES((?), (?), (?))', (0.1, None, None))
+                cursor.execute('INSERT INTO userData VALUES((?), (?), (?), (?))', (0.1, None, None, None))
 
                 cursor.execute(
                     """
@@ -99,8 +100,8 @@ class Session:
     def get_channel(self) -> Tuple[int, int]:
         cursor = self._cursor()
         cursor.execute('SELECT channelId, channelHash FROM Userdata')
-        check = cursor.fetchall()
-        return check[0] if check != (None, None) else None
+        check = cursor.fetchone()
+        return check if check is not None and check != (None, None) else None
 
     @staticmethod
     def _search_builder(query: Sequence[str]) -> str:
@@ -121,10 +122,29 @@ class Session:
         return res
 
     def merge_db(self, db_file: str):
-        conn = sqlite3.connect(db_file)
-        conn.backup(self._conn)
-        self._conn.commit()
-        conn.close()
+        with sqlite3.connect(db_file) as conn:
+            conn.backup(self._conn)
+            self._conn.commit()
+
+    def get_last_backup_id(self):
+        cursor = self._cursor()
+        cursor.execute('SELECT lastBackupMsgId FROM Userdata')
+        check = cursor.fetchone()
+        return check[0] if check is not None else check
+
+    def set_last_backup_id(self, msg_id):
+
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute('UPDATE Userdata SET lastBackupMsgId = (?)',
+                           (msg_id,))
+            self._conn.commit()
+
+    def export_db(self, db_file):
+        with sqlite3.connect(db_file) as conn:
+            self._conn.backup(conn)
+            conn.commit()
+        return db_file
 
     def get_folders(self) -> List[BaseFolder]:
         cursor = self._cursor()
@@ -172,7 +192,8 @@ class Session:
         check = cursor.fetchone()
         return check
 
-    def add_file(self, file_id, file_name, file_tags: (list, tuple), folder_name: (str, BaseFolder)) -> BaseFile:
+    def add_file(self, file_id: str, file_name: str, file_tags: Sequence[str],
+                 folder_name: (str, BaseFolder)) -> BaseFile:
         cursor = self._cursor()
         folder_name = str(folder_name)
 
@@ -180,10 +201,10 @@ class Session:
             raise FolderMissingError("Missing folder: '{}'".format(folder_name))
         if self._check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
-
-        cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?)',
+        with _lock:
+            cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?)',
                        (file_id, file_name, CONST_DATABASE_DELIMITER.join(file_tags), folder_name))
-        self._conn.commit()
+            self._conn.commit()
         return BaseFile(file_id, file_name, file_tags, folder_name)
 
     def search_file(self, query):
@@ -196,3 +217,6 @@ class Session:
             self._search_builder(query),
             (*search_query,))
         return [BaseFile(*f) for f in cursor.fetchall()]
+
+a = Session('Wirtos_new')
+print(a.get_channel())

@@ -6,6 +6,20 @@ from dbmethods import Session
 import platform
 
 
+class PathMaker:
+    def __init__(self, name, path=''):
+        self.name = name
+        self.path = path + os.sep + name if path else name
+
+    def __enter__(self):
+        if not os.path.exists(self.path) or not os.path.isdir(self.path):
+            os.mkdir(self.path)
+        return self.path
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 def find_cloud_by_name(input_title):
     total = client.get_dialogs(limit=0).total_count
     for x, i in enumerate(client.iter_dialogs()):
@@ -46,10 +60,13 @@ def load_db(chat_id):
         for x, m in enumerate(client.iter_history(chat_id, limit=11)):
             if m.document:
                 if m.document.file_name.endswith('.tgdb'):
-                    m.download('temp_db')
-                    db_session.merge_db('temp.db')
+                    with PathMaker('.temp') as path:
+                        m.download(path)
+                        db_session.merge_db(path)
+                        os.remove(path)
                     return db_session.get_channel()
-    except:
+    except Exception as E:
+        print(E)
         return None
 
 
@@ -61,6 +78,25 @@ def upload_file(path):
     return client.send_document(db_session.get_channel()[0], path, progress=upload_callback).document
 
 
+def upload_db():
+    with PathMaker('.temp') as path:
+        filepath = db_session.export_db(path + os.sep + 'temp.db')
+    while True:
+        try:
+            old_msg = db_session.get_last_backup_id()
+            msg_id = client.send_document(db_session.get_channel()[0], filepath).message_id
+            db_session.set_last_backup_id(msg_id)
+        except Exception as E:
+            print(E)
+            continue
+        else:
+            if old_msg is not None:
+                m = client.get_messages(chat_id=db_session.get_channel()[0], message_ids=[old_msg])
+                if m.messages:
+                    m.messages[0].delete() if not m.messages[0].empty else None
+            break
+
+
 def save_file(document: MessageMediaDocument.document, tags, to_folder):
     db_session.add_file(document.file_id, document.file_name, file_tags=tags, folder_name=to_folder)
 
@@ -68,13 +104,15 @@ def save_file(document: MessageMediaDocument.document, tags, to_folder):
 def check_channel(channel_id):
     if channel_id is None:
         return False
+    print(channel_id)
     chat_id, access_hash = channel_id
     try:
-
         a = client.send(channels.GetFullChannel(channel=client.resolve_peer(chat_id)))
         return a
-    except:
+    except Exception as E:
+        print(E)
         return False
+
 
 def phone_handler():
     pass
@@ -104,8 +142,7 @@ def init_login():
 
         channel_id = db_session.get_channel()
 
-
-    upload_file('.gitignore')
+    upload_db()
     client.stop()  # on app exit
 
 
