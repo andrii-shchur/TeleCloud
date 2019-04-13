@@ -5,6 +5,7 @@ import pyrogram
 import os
 from dbmethods import Session
 import platform
+from login import phone_number, telegram_code, two_factor_auth
 
 
 class PathMaker:
@@ -119,18 +120,6 @@ def check_channel(channel_id):
     return chat
 
 
-def phone_handler():
-    pass
-
-
-def code_handler():
-    pass
-
-
-def password_handler():
-    pass
-
-
 def init_login():
     channel_id = db_session.get_channel()
 
@@ -146,7 +135,7 @@ def init_login():
 
         channel_id = db_session.get_channel()
     db_session.add_folder('testf')
-    upload_file('testfile2', ['test1', 'kek', '42'], 'testf', 'D:/grief.wav')
+    # upload_file('testfile2', ['test1', 'kek', '42'], 'testf', 'D:/grief.wav')
     client.stop()  # on app exit
 
 
@@ -159,10 +148,13 @@ if __name__ == '__main__':
                     app_version=__version__,
                     api_id=api_id,
                     api_hash=api_hash,
-                    test_mode=False)
+                    test_mode=False,
+                    phone_code=telegram_code,
+                    phone_number=phone_number,
+                    password=two_factor_auth)
     client.start()
     db_session = Session(session_file)
     chat_title = 'TelegramCloudApp'
     chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(client.get_me().id)
-    chat_photo = 'logo.png'
+    chat_photo = 'gui/logo.png'
     init_login()
