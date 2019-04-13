@@ -16,11 +16,12 @@ class FileDuplicateError(Exception):
 
 
 class BaseFile:
-    def __init__(self, file_id: str, file_name: str, file_tags: Sequence[str], folder_name: str):
+    def __init__(self, file_id: str, file_name: str, file_tags: Sequence[str], folder_name: str, message_id: int):
         self.file_id = file_id
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
         self.folder = str(folder_name)
+        self.message_id = message_id
 
     def __repr__(self):
         return '{}: {}<{}> in {}'.format(self.__class__, self.name, ', '.join(self.tags), self.folder)
@@ -70,7 +71,8 @@ class Session:
                     fileId TEXT,
                     fileName TEXT,
                     fileTags TEXT,
-                    folderName TEXT
+                    folderName TEXT,
+                    messageId INT
                 )
                 """)
 
@@ -193,7 +195,7 @@ class Session:
         return check
 
     def add_file(self, file_id: str, file_name: str, file_tags: Sequence[str],
-                 folder_name: (str, BaseFolder)) -> BaseFile:
+                 folder_name: (str, BaseFolder), message_id: int) -> BaseFile:
         cursor = self._cursor()
         folder_name = str(folder_name)
 
@@ -202,10 +204,10 @@ class Session:
         if self._check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
         with _lock:
-            cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?)',
-                       (file_id, file_name, CONST_DATABASE_DELIMITER.join(file_tags), folder_name))
+            cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?)',
+                           (file_id, file_name, CONST_DATABASE_DELIMITER.join(file_tags), folder_name, message_id))
             self._conn.commit()
-        return BaseFile(file_id, file_name, file_tags, folder_name)
+        return BaseFile(file_id, file_name, file_tags, folder_name, message_id)
 
     def search_file(self, query):
         cursor = self._cursor()
@@ -217,6 +219,3 @@ class Session:
             self._search_builder(query),
             (*search_query,))
         return [BaseFile(*f) for f in cursor.fetchall()]
-
-a = Session('Wirtos_new')
-print(a.get_channel())
