@@ -87,7 +87,7 @@ class Session:
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
         if not hasattr(self, '_conn') or self._conn is None:
-            self._conn = sqlite3.connect('{}.db'.format(self.session_name), check_same_thread=False)
+            self._conn = sqlite3.connect('{}.tgdb'.format(self.session_name), check_same_thread=False)
             self._conn.create_collation('ALLNOCASEIN',
                                         (lambda cell, string: 0 if string.lower() in cell.lower() else -1))
         return self._conn.cursor()
@@ -219,3 +219,4 @@ class Session:
             self._search_builder(query),
             (*search_query,))
         return [BaseFile(*f) for f in cursor.fetchall()]
+

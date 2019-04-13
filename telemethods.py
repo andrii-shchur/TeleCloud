@@ -26,17 +26,18 @@ def find_cloud_by_name():
     total = client.get_dialogs(limit=0).total_count
     for x, i in enumerate(client.iter_dialogs()):
         print('{}/{}'.format(x, total))
-        if i.chat.type == 'channel' and i.chat.description == chat_desc and i.chat.title == chat_title:
-            load_db(i.chat.id)
-            return db_session.get_channel()
+        if i.chat.type == 'channel' and i.chat.title == chat_title:
+            full_chat = client.get_chat(i.chat.id)
+            if full_chat.description == chat_desc:
+                load_db(i.chat.id)
+                return db_session.get_channel()
 
 
 def find_cloud_by_backup():
-    total = client.get_dialogs(limit=0).total_count
     for x, i in enumerate(client.iter_dialogs()):
-        print('{}/{}'.format(x, total))
-        load_db(i.chat.id)
-        return db_session.get_channel()
+        if i.chat.type == 'channel':
+            if load_db(i.chat.id):
+                return db_session.get_channel()
 
 
 def create_cloud_channel():
@@ -56,20 +57,19 @@ def load_db(chat_id):
             if m.document:
                 if m.document.file_name.endswith('.tgdb'):
                     with PathMaker('.temp') as path:
-                        filepath = '{}{}{}'.format(path, os.sep, '.temp.db')
+                        filepath = '{}{}{}'.format(path, os.sep, 'temp_db.tgdb')
+                        print(filepath)
                         m.download(filepath)
                         db_session.merge_db(filepath)
-                        os.remove(path)
                     return db_session.get_channel()
     except Exception as E:
         print(E)
         return None
 
 
-
 def upload_db():
     with PathMaker('.temp') as path:
-        filepath = db_session.export_db('{}{}{}'.format(path, os.sep, 'temp.db'))
+        filepath = db_session.export_db('{}{}{}'.format(path, os.sep, 'temp_db.tgdb'))
     while True:
         try:
             old_msg = db_session.get_last_backup_id()
@@ -88,6 +88,7 @@ def upload_db():
 
 def save_file(file_id: str, to_folder):
     client.download_media(message=file_id, file_name=to_folder)
+
 
 def upload_callback(client: Client, current, total):
     print('{}/{}'.format(current, total))
@@ -142,7 +143,7 @@ def init_login():
 if __name__ == '__main__':
     api_id = 576793
     api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
-    session_file = 'TeleCloud'
+    session_file = 'Wirtos_new'
     client = Client(session_file,
                     device_model=platform.system(),
                     app_version=__version__,
