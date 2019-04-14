@@ -13,7 +13,6 @@ from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingErr
 def find_cloud_by_name():
     total = client.get_dialogs(limit=0).total_count
     for x, i in enumerate(client.iter_dialogs()):
-        print('{}/{}'.format(x, total))
         if i.chat.type == 'channel' and i.chat.title == chat_title:
             full_chat = client.get_chat(i.chat.id)
             if full_chat.description == chat_desc:
@@ -113,6 +112,7 @@ def check_channel(channel_id):
     except (ValueError, pyrogram.RPCError, pyrogram.errors.exceptions.bad_request_400.PeerIdInvalid) as E:
         print(E)
         return False
+    load_db(chat.id)
     if chat.title != chat_title or \
             chat.description != chat_desc:
         client.set_chat_description(chat_id, chat_desc)
