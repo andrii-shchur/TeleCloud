@@ -8,7 +8,7 @@ from login import phone_number, telegram_code, two_factor_auth
 from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts
 from pyrogram.errors import FloodWait
 from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingError
-
+from pyrewrite import TeleCloudClient
 
 def find_cloud_by_name():
     total = client.get_dialogs(limit=0).total_count
@@ -23,7 +23,9 @@ def find_cloud_by_name():
 
 
 def find_cloud_by_backup():
+    total = client.get_dialogs(limit=0).total_count
     for x, i in enumerate(client.iter_dialogs()):
+        print(x, total, sep='/')
         if i.chat.type == 'channel':
             if load_db(i.chat.id):
                 return db_session.get_channel()
@@ -122,28 +124,31 @@ def check_channel(channel_id):
 
 def init_login():
     channel_id = db_session.get_channel()
-
+    ret = None
+    back_executed = False
     while not check_channel(channel_id):
         channel_id = find_cloud_by_name()
         if channel_id:
             channel_id = db_session.get_channel()
-        elif input('try to find latest files backup automatically? (On name or description change)') == 'y':
-            channel_id = find_cloud_by_backup()
+            ret = 0
+        elif not back_executed and find_cloud_by_backup():
+            ret = 1
+            break
         if not channel_id:
-            channel = create_cloud_channel().chats[0]
-            db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
+            ret = 2
+            break
+    return ret
 
-        channel_id = db_session.get_channel()
-
-    client.stop()  # on app exit
-    print('end')
+def create_and_set_channel():
+    channel = create_cloud_channel().chats[0]
+    db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
 
 
 if __name__ == '__main__':
     api_id = 576793
     api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
-    session_file = 'Wirtos_new'
-    client = Client(session_file,
+    session_file = 'Session2'
+    client = TeleCloudClient(session_file,
                     device_model=platform.system(),
                     app_version=__version__,
                     api_id=api_id,
@@ -152,9 +157,10 @@ if __name__ == '__main__':
                     phone_code=telegram_code,
                     phone_number=phone_number,
                     password=two_factor_auth)
+
     client.start()
     db_session = Session(session_file)
     chat_title = 'TelegramCloudApp'
     chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(client.get_me().id)
     chat_photo = 'gui/logo.png'
-    init_login()
+    ret_channel = init_login()

@@ -12,18 +12,99 @@ from pyrogram.errors import (
 )
 from typing import Union
 from pyrogram.session import Auth, Session
-
+from pyrogram.client.ext import utils
 import logging
 import time
 import pyrogram
 
 import binascii
-import os
 import struct
-
-from pyrogram.client.ext import BaseClient, utils
+import hashlib
+import os
 
 log = logging.getLogger(__name__)
+
+
+def btoi(b: bytes) -> int:
+    return int.from_bytes(b, "big")
+
+
+def itob(i: int) -> bytes:
+    return i.to_bytes(256, "big")
+
+
+def sha256(data: bytes) -> bytes:
+    return hashlib.sha256(data).digest()
+
+
+def xor(a: bytes, b: bytes) -> bytes:
+    return bytes(i ^ j for i, j in zip(a, b))
+
+
+def compute_hash(algo: types.PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow, password: str) -> bytes:
+    hash1 = sha256(algo.salt1 + password.encode() + algo.salt1)
+    hash2 = sha256(algo.salt2 + hash1 + algo.salt2)
+    hash3 = hashlib.pbkdf2_hmac("sha512", hash2, algo.salt1, 100000)
+
+    return sha256(algo.salt2 + hash3 + algo.salt2)
+
+
+# noinspection PyPep8Naming
+def compute_check(r: types.account.Password, password: str) -> types.InputCheckPasswordSRP:
+    algo = r.current_algo
+
+    p_bytes = algo.p
+    p = btoi(algo.p)
+
+    g_bytes = itob(algo.g)
+    g = algo.g
+
+    B_bytes = r.srp_B
+    B = btoi(B_bytes)
+
+    srp_id = r.srp_id
+
+    x_bytes = compute_hash(algo, password)
+    x = btoi(x_bytes)
+
+    g_x = pow(g, x, p)
+
+    k_bytes = sha256(p_bytes + g_bytes)
+    k = btoi(k_bytes)
+
+    kg_x = (k * g_x) % p
+
+    while True:
+        a_bytes = os.urandom(256)
+        a = btoi(a_bytes)
+
+        A = pow(g, a, p)
+        A_bytes = itob(A)
+
+        u = btoi(sha256(A_bytes + B_bytes))
+
+        if u > 0:
+            break
+
+    g_b = (B - kg_x) % p
+
+    ux = u * x
+    a_ux = a + ux
+    S = pow(g_b, a_ux, p)
+    S_bytes = itob(S)
+
+    K_bytes = sha256(S_bytes)
+
+    M1_bytes = sha256(
+        xor(sha256(p_bytes), sha256(g_bytes))
+        + sha256(algo.salt1)
+        + sha256(algo.salt2)
+        + A_bytes
+        + B_bytes
+        + K_bytes
+    )
+
+    return types.InputCheckPasswordSRP(srp_id=srp_id, A=A_bytes, M1=M1_bytes)
 
 
 class TeleCloudClient(PyrogramClient):
@@ -35,7 +116,7 @@ class TeleCloudClient(PyrogramClient):
             phone_number: callable,
             phone_code: callable,
             password: callable,
-            recovery_code: callable,
+            recovery_code: callable = None,
             app_version: str = None,
             device_model: str = None,
             system_version: str = None,
@@ -54,6 +135,7 @@ class TeleCloudClient(PyrogramClient):
             no_updates: bool = None,
             takeout: bool = None
     ):
+
         super(TeleCloudClient, self).__init__(
             session_name,
             api_id=api_id,
@@ -80,17 +162,15 @@ class TeleCloudClient(PyrogramClient):
             no_updates=no_updates,
             takeout=takeout
         )
+        self.phone_callback: callable = phone_number
+        self.code_callback: callable = phone_code
+        self.password_callback: callable = password
 
     def authorize_user(self):
-        phone_number_invalid_raises = self.phone_number is not None
-        phone_code_invalid_raises = self.phone_code is not None
-        password_invalid_raises = self.password is not None
-        first_name_invalid_raises = self.first_name is not None
-
         while True:
-
-            self.phone_number = self.phone_number().strip("+")
-
+            print('there')
+            self.phone_number = str(self.phone_callback()).strip("+")
+            print(self.phone_number)
             try:
                 r = self.send(
                     functions.auth.SendCode(
@@ -102,7 +182,7 @@ class TeleCloudClient(PyrogramClient):
                 )
             except (PhoneMigrate, NetworkMigrate) as e:
                 self.session.stop()
-
+                print(self.dc_id)
                 self.dc_id = e.x
 
                 self.auth_key = Auth(
@@ -117,144 +197,124 @@ class TeleCloudClient(PyrogramClient):
                     self.dc_id,
                     self.auth_key
                 )
-
                 self.session.start()
-            except (PhoneNumberInvalid, PhoneNumberBanned) as e:
-                if phone_number_invalid_raises:
-                    raise
-                else:
-                    print(e.MESSAGE)
-                    self.phone_number = None
-            except FloodWait as e:
-                if phone_number_invalid_raises:
-                    raise
-                else:
-                    print(e.MESSAGE.format(x=e.x))
-                    time.sleep(e.x)
-            except Exception as e:
-                log.error(e, exc_info=True)
-                raise
-            else:
-                break
 
-        phone_registered = r.phone_registered
-        phone_code_hash = r.phone_code_hash
-        terms_of_service = r.terms_of_service
+                r = self.send(
+                    functions.auth.SendCode(
+                        phone_number=self.phone_number,
+                        api_id=self.api_id,
+                        api_hash=self.api_hash,
+                        settings=types.CodeSettings()
+                    )
+                )
+                phone_registered = r.phone_registered
+                phone_code_hash = r.phone_code_hash
+                terms_of_service = r.terms_of_service
+                print('Got there')
+                if not phone_registered:
+                    continue
+                else:
+                    break
+
+            except (PhoneNumberInvalid, PhoneNumberBanned) as e:
+                raise e
+                continue  # todo
+
+            except FloodWait as e:
+                raise e
+                # todo
+                print(e.MESSAGE.format(x=e.x))
+                time.sleep(e.x)
+                continue
+
+            except Exception as e:
+                raise e
+                log.error(e, exc_info=True)
+                continue
+
+            else:
+                print(r)
+                phone_registered = r.phone_registered
+                phone_code_hash = r.phone_code_hash
+                terms_of_service = r.terms_of_service
+                print('Got there')
+                if not phone_registered:
+                    continue
+                else:
+                    break
 
         TeleCloudClient.terms_of_service_displayed = True
 
-        if self.force_sms:
-            self.send(
-                functions.auth.ResendCode(
-                    phone_number=self.phone_number,
-                    phone_code_hash=phone_code_hash
-                )
-            )
-
         while True:
-            if not phone_registered:
-                self.restart()
-                return
-
-            self.phone_code = self.phone_code(self.phone_number)
+            self.phone_code = str(self.code_callback(self.phone_number))
 
             try:
 
-                try:
-                    r = self.send(
-                        functions.auth.SignIn(
+                r = self.send(
+                    functions.auth.SignIn(
+                        phone_number=self.phone_number,
+                        phone_code_hash=phone_code_hash,
+                        phone_code=self.phone_code
+                    )
+                )
+
+                if self.force_sms:
+                    self.send(
+                        functions.auth.ResendCode(
                             phone_number=self.phone_number,
-                            phone_code_hash=phone_code_hash,
-                            phone_code=self.phone_code
+                            phone_code_hash=phone_code_hash
                         )
                     )
-                except PhoneNumberUnoccupied:
-                    self.restart()
-                    return
-
             except (PhoneCodeInvalid, PhoneCodeEmpty, PhoneCodeExpired, PhoneCodeHashEmpty) as e:
-                if phone_code_invalid_raises:
-                    raise
-                else:
-                    print(e.MESSAGE)
-                    self.phone_code = None
-            except FirstnameInvalid as e:
-                if first_name_invalid_raises:
-                    raise
-                else:
-                    print(e.MESSAGE)
-                    self.first_name = None
+                continue
+
             except SessionPasswordNeeded as e:
                 print(e.MESSAGE)
-
-                def default_password_callback(password_hint: str) -> str:
-                    print("Hint: {}".format(password_hint))
-                    return input("Enter password (empty to recover): ")
-
-                def default_recovery_callback(email_pattern: str) -> str:
-                    print("An e-mail containing the recovery code has been sent to {}".format(email_pattern))
-                    return input("Enter password recovery code: ")
-
                 while True:
                     try:
                         r = self.send(functions.account.GetPassword())
 
-                        self.password = (
-                            default_password_callback(r.hint) if self.password is None
-                            else str(self.password(r.hint) or "") if callable(self.password)
-                            else str(self.password)
+                        self.password = str(self.password_callback(r.hint))
+
+                        # if self.password == "":
+                        #     r = self.send(functions.auth.RequestPasswordRecovery())
+                        #
+                        #     self.recovery_code = (
+                        #          default_recovery_callback(r.email_pattern) if self.recovery_code is None
+                        #          else str(self.recovery_code(r.email_pattern)) if callable(self.recovery_code)
+                        #          else str(self.recovery_code)
+                        #      )
+                        #
+                        #     r = self.send(
+                        #         functions.auth.RecoverPassword(
+                        #             code=self.recovery_code
+                        #         )
+                        #     )
+
+                        r = self.send(
+                            functions.auth.CheckPassword(
+                                password=compute_check(r, self.password)
+                            )
                         )
-
-                        if self.password == "":
-                            r = self.send(functions.auth.RequestPasswordRecovery())
-
-                            self.recovery_code = (
-                                default_recovery_callback(r.email_pattern) if self.recovery_code is None
-                                else str(self.recovery_code(r.email_pattern)) if callable(self.recovery_code)
-                                else str(self.recovery_code)
-                            )
-
-                            r = self.send(
-                                functions.auth.RecoverPassword(
-                                    code=self.recovery_code
-                                )
-                            )
-                        else:
-                            r = self.send(
-                                functions.auth.CheckPassword(
-                                    password=compute_check(r, self.password)
-                                )
-                            )
                     except (PasswordEmpty, PasswordRecoveryNa, PasswordHashInvalid) as e:
-                        if password_invalid_raises:
-                            raise
-                        else:
-                            print(e.MESSAGE)
-                            self.password = None
-                            self.recovery_code = None
+                        continue
+
                     except FloodWait as e:
-                        if password_invalid_raises:
-                            raise
-                        else:
-                            print(e.MESSAGE.format(x=e.x))
-                            time.sleep(e.x)
-                            self.password = None
-                            self.recovery_code = None
+                        time.sleep(e.x)
+                        continue
                     except Exception as e:
                         log.error(e, exc_info=True)
-                        raise
+                        continue
                     else:
                         break
                 break
             except FloodWait as e:
-                if phone_code_invalid_raises or first_name_invalid_raises:
-                    raise
-                else:
-                    print(e.MESSAGE.format(x=e.x))
-                    time.sleep(e.x)
+                time.sleep(e.x)
+                continue
+
             except Exception as e:
                 log.error(e, exc_info=True)
-                raise
+                continue
             else:
                 break
 
@@ -265,15 +325,13 @@ class TeleCloudClient(PyrogramClient):
                 )
             )
 
-        self.password = None
         self.user_id = r.user.id
 
-        print("Logged in successfully as {}".format(r.user.first_name))
-
-    def send_document(
+    def send_named_document(
             self,
             chat_id: Union[int, str],
             document: str,
+            file_name: str,
             thumb: str = None,
             caption: str = "",
             parse_mode: str = "",
@@ -300,7 +358,7 @@ class TeleCloudClient(PyrogramClient):
                     file=file,
                     thumb=thumb,
                     attributes=[
-                        types.DocumentAttributeFilename(file_name=os.path.basename(document))
+                        types.DocumentAttributeFilename(file_name=file_name)
                     ]
                 )
             elif document.startswith("http"):
