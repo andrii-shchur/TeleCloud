@@ -1,27 +1,24 @@
 import sqlite3
 import threading
 from typing import List, Sequence, Tuple
+from teleclouderrors import FolderMissingError, FileDuplicateError
 
 CONST_DATABASE_DELIMITER = '\0'
 
 _lock = threading.RLock()
 
 
-class FolderMissingError(Exception):
-    pass
-
-
-class FileDuplicateError(Exception):
-    pass
-
-
 class BaseFile:
-    def __init__(self, file_id: str, file_name: str, file_tags: Sequence[str], folder_name: str, message_id: int):
-        self.file_id = file_id
+    def __init__(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], folder_name: str,
+                 message_ids: Sequence[int]):
+        self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
         self.folder = str(folder_name)
-        self.message_id = message_id
+        self.message_ids = [
+            int(i) for i in
+            (message_ids.split(CONST_DATABASE_DELIMITER) if isinstance(message_ids, str) else message_ids)
+        ]
 
     def __repr__(self):
         return '{}: {}<{}> in {}'.format(self.__class__, self.name, ', '.join(self.tags), self.folder)
@@ -72,7 +69,7 @@ class Session:
                     fileName TEXT,
                     fileTags TEXT,
                     folderName TEXT,
-                    messageId INT
+                    messageId TEXT
                 )
                 """)
 
@@ -124,9 +121,10 @@ class Session:
         return res
 
     def merge_db(self, db_file: str):
-        with sqlite3.connect(db_file) as conn:
-            conn.backup(self._conn)
-            self._conn.commit()
+        with _lock:
+            with sqlite3.connect(db_file) as conn:
+                conn.backup(self._conn)
+                self._conn.commit()
 
     def get_last_backup_id(self):
         cursor = self._cursor()
@@ -143,9 +141,10 @@ class Session:
             self._conn.commit()
 
     def export_db(self, db_file):
-        with sqlite3.connect(db_file) as conn:
-            self._conn.backup(conn)
-            conn.commit()
+        with _lock:
+            with sqlite3.connect(db_file) as conn:
+                self._conn.backup(conn)
+                conn.commit()
         return db_file
 
     def get_folders(self) -> List[BaseFolder]:
@@ -194,8 +193,8 @@ class Session:
         check = cursor.fetchone()
         return check
 
-    def add_file(self, file_id: str, file_name: str, file_tags: Sequence[str],
-                 folder_name: (str, BaseFolder), message_id: int) -> BaseFile:
+    def add_file(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str],
+                 folder_name: (str, BaseFolder), message_ids: Sequence[int]) -> BaseFile:
         cursor = self._cursor()
         folder_name = str(folder_name)
 
@@ -205,9 +204,13 @@ class Session:
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
         with _lock:
             cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?)',
-                           (file_id, file_name, CONST_DATABASE_DELIMITER.join(file_tags), folder_name, message_id))
+                           (CONST_DATABASE_DELIMITER.join(file_ids),
+                            file_name,
+                            CONST_DATABASE_DELIMITER.join(file_tags),
+                            folder_name,
+                            CONST_DATABASE_DELIMITER.join((str(i) for i in message_ids))))
             self._conn.commit()
-        return BaseFile(file_id, file_name, file_tags, folder_name, message_id)
+        return BaseFile(file_ids, file_name, file_tags, folder_name, message_ids)
 
     def search_file(self, query):
         cursor = self._cursor()
@@ -219,4 +222,3 @@ class Session:
             self._search_builder(query),
             (*search_query,))
         return [BaseFile(*f) for f in cursor.fetchall()]
-

@@ -1,25 +1,13 @@
 from pyrogram import Client, __version__
 from pyrogram.api.functions import channels
-from pyrogram.api.types import MessageMediaDocument
 import pyrogram
-import os
+
 from dbmethods import Session
 import platform
 from login import phone_number, telegram_code, two_factor_auth
-
-
-class PathMaker:
-    def __init__(self, name, path=''):
-        self.name = name
-        self.path = os.path.join(path, name)
-
-    def __enter__(self):
-        if not os.path.exists(self.path) or not os.path.isdir(self.path):
-            os.mkdir(self.path)
-        return self.path
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts
+from pyrogram.errors import FloodWait
+from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingError
 
 
 def find_cloud_by_name():
@@ -29,7 +17,9 @@ def find_cloud_by_name():
         if i.chat.type == 'channel' and i.chat.title == chat_title:
             full_chat = client.get_chat(i.chat.id)
             if full_chat.description == chat_desc:
-                load_db(i.chat.id)
+                if not load_db(i.chat.id):
+                    peer = client.resolve_peer(i.chat.id)
+                    db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
                 return db_session.get_channel()
 
 
@@ -56,11 +46,9 @@ def load_db(chat_id):
         for x, m in enumerate(client.iter_history(chat_id, limit=11)):
             if m.document:
                 if m.document.file_name.endswith('.tgdb'):
-                    with PathMaker('.temp') as path:
-                        filepath = '{}{}{}'.format(path, os.sep, 'temp_db.tgdb')
-                        print(filepath)
-                        m.download(filepath)
-                        db_session.merge_db(filepath)
+                    with TempFileMaker() as path:
+                        m.download(path.name)
+                        db_session.merge_db(path.name)
                     return db_session.get_channel()
     except Exception as E:
         print(E)
@@ -68,22 +56,21 @@ def load_db(chat_id):
 
 
 def upload_db():
-    with PathMaker('.temp') as path:
-        filepath = db_session.export_db('{}{}{}'.format(path, os.sep, 'temp_db.tgdb'))
+    with TempFileMaker() as path:
+        db_session.export_db(path.name)
     while True:
         try:
             old_msg = db_session.get_last_backup_id()
-            msg_id = client.send_document(db_session.get_channel()[0], filepath).message_id
+            msg_id = client.send_document(db_session.get_channel()[0], path.name).message_id
             db_session.set_last_backup_id(msg_id)
         except pyrogram.RPCError:
             continue
 
-        else:
-            if old_msg is not None:
-                m = client.get_messages(chat_id=db_session.get_channel()[0], message_ids=[old_msg])
-                if m.messages:
-                    m.messages[0].delete() if not m.messages[0].empty else None
-            break
+        if old_msg is not None:
+            m = client.get_messages(chat_id=db_session.get_channel()[0], message_ids=[old_msg])
+            if m.messages:
+                m.messages[0].delete() if not m.messages[0].empty else None
+        break
 
 
 def save_file(file_id: str, to_folder):
@@ -95,14 +82,25 @@ def upload_callback(client: Client, current, total):
 
 
 def upload_file(file_name, tags, to_folder, file):
-    file = client.send_document(db_session.get_channel()[0], document=file, progress=upload_callback)
-    db_session.add_file(
-        file.document.file_id,
-        file_name=file_name,
-        file_tags=tags,
-        folder_name=to_folder,
-        message_id=file.message_id)
-    upload_db()
+    file_ids = []
+    message_ids = []
+    try:
+        file = client.send_document(db_session.get_channel()[0], document=file, progress=upload_callback)
+        file_ids.append(file.document.file_id)
+        message_ids.append(file.message_id)
+    except FloodWait as err:
+        print(err)
+    else:
+        try:
+            db_session.add_file(
+                file_ids=file_ids,
+                file_name=file_name,
+                file_tags=tags,
+                folder_name=to_folder,
+                message_ids=message_ids)
+        except (FolderMissingError, FileDuplicateError):
+            pass
+        upload_db()
 
 
 def check_channel(channel_id):
@@ -112,7 +110,8 @@ def check_channel(channel_id):
 
     try:
         chat = client.get_chat(chat_id)
-    except (ValueError, pyrogram.RPCError):
+    except (ValueError, pyrogram.RPCError, pyrogram.errors.exceptions.bad_request_400.PeerIdInvalid) as E:
+        print(E)
         return False
     if chat.title != chat_title or \
             chat.description != chat_desc:
@@ -135,9 +134,9 @@ def init_login():
             db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
 
         channel_id = db_session.get_channel()
-    db_session.add_folder('testf')
-    # upload_file('testfile2', ['test1', 'kek', '42'], 'testf', 'D:/grief.wav')
+
     client.stop()  # on app exit
+    print('end')
 
 
 if __name__ == '__main__':
