@@ -5,10 +5,11 @@ import pyrogram
 from dbmethods import Session
 import platform
 from login import phone_number, telegram_code, two_factor_auth
-from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts
+from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts, const_max_size
 from pyrogram.errors import FloodWait
 from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingError
 from pyrewrite import TeleCloudClient
+import os
 
 
 class TeleCloudApp:
@@ -27,7 +28,7 @@ class TeleCloudApp:
                                       password=two_factor_auth)
 
         self.client.start()
-        self.db_session = Session(session_file)
+        self.db_session: Session = Session(session_file)
         self.chat_title = 'TelegramCloudApp'
         self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)
         self.chat_photo = 'gui/logo.png'
@@ -101,6 +102,11 @@ class TeleCloudApp:
     def upload_file(self, file_name, tags, to_folder, file):
         file_ids = []
         message_ids = []
+        filesize = os.path.getsize(file_name)
+        if filesize <= const_max_size:
+            file_parts = [file_name]
+        else:
+            file_parts = split_into_parts(file_name)
         try:
             file = self.client.send_named_document(
                 self.db_session.get_channel()[0],
@@ -117,6 +123,7 @@ class TeleCloudApp:
                     file_ids=file_ids,
                     file_name=file_name,
                     file_tags=tags,
+                    file_size=filesize,
                     folder_name=to_folder,
                     message_ids=message_ids)
             except (FolderMissingError, FileDuplicateError):
@@ -142,7 +149,7 @@ class TeleCloudApp:
 
     def init_login(self):
         channel_id = self.db_session.get_channel()
-        ret = None
+        ret = 0
         back_executed = False
         while not self.check_channel(channel_id):
             channel_id = self.find_cloud_by_name()
