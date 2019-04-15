@@ -159,7 +159,7 @@ class Session:
         cursor.execute('SELECT DISTINCT folderName from Folders')
         return [self.get_folder(f[0]) for f in cursor.fetchall()]
 
-    def _check_folder_exists(self, folder_name: (str, BaseFolder)) -> bool:
+    def check_folder_exists(self, folder_name: (str, BaseFolder)) -> bool:
         cursor = self._cursor()
         folder_name = str(folder_name)
         cursor.execute('SELECT DISTINCT folderName from Folders WHERE folderName == (?)', (folder_name,))
@@ -169,7 +169,7 @@ class Session:
     def get_folder(self, folder_name: (str, BaseFolder), fetchmany: int = None) -> BaseFolder:
         cursor = self._cursor()
         folder_name = str(folder_name)
-        if not self._check_folder_exists(folder_name):
+        if not self.check_folder_exists(folder_name):
             raise FolderMissingError
         cursor.execute('SELECT * from Files WHERE folderName == (?)', (folder_name,))
         return BaseFolder(folder_name, [BaseFile(*i) for i in cursor.fetchall()]) if not fetchmany \
@@ -178,7 +178,7 @@ class Session:
     def add_folder(self, folder_name: (str, BaseFolder)):
         cursor = self._cursor()
         folder_name = str(folder_name)
-        check = self._check_folder_exists(folder_name)
+        check = self.check_folder_exists(folder_name)
         if check:
             raise FolderDuplicateError
         with _lock:
@@ -197,13 +197,13 @@ class Session:
         cursor = self._cursor()
         file_name = str(file_name)
         folder_name = str(folder_name)
-        if not self._check_file_exists(file_name, folder_name):
+        if not self.check_file_exists(file_name, folder_name):
             raise FileMissingError('')
         cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileName == (?) AND folderName == (?)',
                        (file_name, folder_name))
         return BaseFile(*cursor.fetchone())
 
-    def _check_file_exists(self, file_name: str, folder_name: (str, BaseFolder)) -> bool:
+    def check_file_exists(self, file_name: str, folder_name: (str, BaseFolder)) -> bool:
         folder_name = str(folder_name)
         cursor = self._cursor()
         cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileName == (?) AND folderName == (?)',
@@ -216,9 +216,9 @@ class Session:
         cursor = self._cursor()
         folder_name = str(folder_name)
 
-        if not self._check_folder_exists(folder_name):
+        if not self.check_folder_exists(folder_name):
             raise FolderMissingError("Missing folder: '{}'".format(folder_name))
-        if self._check_file_exists(file_name, folder_name):
+        if self.check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
         with _lock:
             cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?, ?)',
@@ -237,13 +237,13 @@ class Session:
         from_folder = str(from_folder)
         to_folder = str(to_folder)
         file_name = str(file_name)
-        if not self._check_folder_exists(from_folder):
+        if not self.check_folder_exists(from_folder):
             raise FolderMissingError("Missing folder: '{}'".format(from_folder))
-        if not self._check_folder_exists(to_folder):
+        if not self.check_folder_exists(to_folder):
             raise FolderMissingError("Missing folder: '{}'".format(to_folder))
-        if not self._check_file_exists(file_name, from_folder):
+        if not self.check_file_exists(file_name, from_folder):
             raise FileMissingError("Missing file: '{}' in folder: '{}'".format(file_name, from_folder))
-        target_file_exists = self._check_file_exists(file_name, to_folder)
+        target_file_exists = self.check_file_exists(file_name, to_folder)
         file = self.get_file_by_folder(file_name, from_folder)
         if rewrite and target_file_exists:
             with _lock:

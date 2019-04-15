@@ -9,7 +9,7 @@ from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts, 
 from pyrogram.errors import FloodWait
 from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingError
 from pyrewrite import TeleCloudClient
-import os
+import os, tempfile, time, shutil
 
 
 class TeleCloudApp:
@@ -99,36 +99,48 @@ class TeleCloudApp:
     def upload_callback(self, client: Client, current, total):
         print('{}/{}'.format(current, total))
 
-    def upload_file(self, file_name, tags, to_folder, file):
+    def upload_file(self, file_name, tags, to_folder, ):
+
+        if not self.db_session.check_folder_exists(to_folder):
+            raise FolderMissingError("Missing folder: '{}'".format(to_folder))
+        if self.db_session.check_file_exists(file_name, to_folder):
+            raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, to_folder))
         file_ids = []
         message_ids = []
         filesize = os.path.getsize(file_name)
-        if filesize <= const_max_size:
-            file_parts = [file_name]
-        else:
-            file_parts = split_into_parts(file_name)
+        temp_dir = tempfile.TemporaryDirectory()
         try:
-            file = self.client.send_named_document(
-                self.db_session.get_channel()[0],
+            if filesize <= const_max_size:
+
+                file_cp = shutil.copy(file_name, temp_dir.name)
+                file_parts = [file_cp]
+            else:
+                file_cp = shutil.copy(file_name, temp_dir.name)
+                file_parts = split_into_parts(file_cp)
+
+            for file_part in file_parts:
+                try:
+                    file = self.client.send_named_document(
+                        self.db_session.get_channel()[0],
+                        file_name=os.path.basename(file_part),
+                        document=file_part,
+                        progress=self.upload_callback)
+                    file_ids.append(file.document.file_id)
+                    message_ids.append(file.message_id)
+                except FloodWait as err:
+                    time.sleep(err.x)
+
+            self.db_session.add_file(
+                file_ids=file_ids,
                 file_name=file_name,
-                document=file,
-                progress=self.upload_callback)
-            file_ids.append(file.document.file_id)
-            message_ids.append(file.message_id)
-        except FloodWait as err:
-            print(err)
-        else:
-            try:
-                self.db_session.add_file(
-                    file_ids=file_ids,
-                    file_name=file_name,
-                    file_tags=tags,
-                    file_size=filesize,
-                    folder_name=to_folder,
-                    message_ids=message_ids)
-            except (FolderMissingError, FileDuplicateError):
-                pass
+                file_tags=tags,
+                file_size=filesize,
+                folder_name=to_folder,
+                message_ids=message_ids)
+
             self.upload_db()
+        finally:
+            temp_dir.cleanup()
 
     def check_channel(self, channel_id):
         if channel_id is None:
