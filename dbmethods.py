@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from typing import List, Sequence, Tuple
-from teleclouderrors import FolderMissingError, FileDuplicateError
+from teleclouderrors import FolderMissingError, FolderDuplicateError, FileDuplicateError, FileMissingError
 
 CONST_DATABASE_DELIMITER = '\0'
 
@@ -9,11 +9,12 @@ _lock = threading.RLock()
 
 
 class BaseFile:
-    def __init__(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], folder_name: str,
-                 message_ids: Sequence[int]):
+    def __init__(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], size: int, folder_name: str,
+                 message_ids: Sequence[int], ):
         self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
+        self.size = size
         self.folder = str(folder_name)
         self.message_ids = [
             int(i) for i in
@@ -23,11 +24,16 @@ class BaseFile:
     def __repr__(self):
         return '{}: {}<{}> in {}'.format(self.__class__, self.name, ', '.join(self.tags), self.folder)
 
+    def __iter__(self):
+        return iter((self.file_ids, self.name, self.tags, self.size, self.folder, self.message_ids))
+
 
 class BaseFolder:
     def __init__(self, folder_name: str, files_array: Sequence):
         self.name = folder_name
-        self.storage = [i for i in files_array]
+        self.storage = [f for f in files_array]
+        self.total = len(self.storage)
+        self.size = sum((f.size for f in self.storage))
 
     def __iter__(self):
         return iter(self.storage)
@@ -68,6 +74,7 @@ class Session:
                     fileId TEXT,
                     fileName TEXT,
                     fileTags TEXT,
+                    fileSize INTEGER,
                     folderName TEXT,
                     messageId TEXT
                 )
@@ -162,9 +169,9 @@ class Session:
     def get_folder(self, folder_name: (str, BaseFolder), fetchmany: int = None) -> BaseFolder:
         cursor = self._cursor()
         folder_name = str(folder_name)
-        cursor.execute('SELECT * from Files WHERE folderName == (?)', (folder_name,))
         if not self._check_folder_exists(folder_name):
             raise FolderMissingError
+        cursor.execute('SELECT * from Files WHERE folderName == (?)', (folder_name,))
         return BaseFolder(folder_name, [BaseFile(*i) for i in cursor.fetchall()]) if not fetchmany \
             else BaseFolder(folder_name, [BaseFile(*i) for i in cursor.fetchmany(fetchmany)])
 
@@ -173,9 +180,10 @@ class Session:
         folder_name = str(folder_name)
         check = self._check_folder_exists(folder_name)
         if check:
-            return False
-        cursor.execute('INSERT INTO Folders VALUES(?)', (folder_name,))
-        self._conn.commit()
+            raise FolderDuplicateError
+        with _lock:
+            cursor.execute('INSERT INTO Folders VALUES(?)', (folder_name,))
+            self._conn.commit()
         return BaseFolder(folder_name, [])
 
     def get_file(self, file_id: int) -> BaseFile:
@@ -185,6 +193,16 @@ class Session:
         check = cursor.fetchone()
         return BaseFile(*check) if check else None
 
+    def get_file_by_folder(self, file_name, folder_name):
+        cursor = self._cursor()
+        file_name = str(file_name)
+        folder_name = str(folder_name)
+        if not self._check_file_exists(file_name, folder_name):
+            raise FileMissingError('')
+        cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileName == (?) AND folderName == (?)',
+                       (file_name, folder_name))
+        return BaseFile(*cursor.fetchone())
+
     def _check_file_exists(self, file_name: str, folder_name: (str, BaseFolder)) -> bool:
         folder_name = str(folder_name)
         cursor = self._cursor()
@@ -193,7 +211,7 @@ class Session:
         check = cursor.fetchone()
         return check
 
-    def add_file(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str],
+    def add_file(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], file_size: int,
                  folder_name: (str, BaseFolder), message_ids: Sequence[int]) -> BaseFile:
         cursor = self._cursor()
         folder_name = str(folder_name)
@@ -203,14 +221,106 @@ class Session:
         if self._check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
         with _lock:
-            cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?)',
+            cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?, ?)',
                            (CONST_DATABASE_DELIMITER.join(file_ids),
                             file_name,
                             CONST_DATABASE_DELIMITER.join(file_tags),
+                            file_size,
                             folder_name,
-                            CONST_DATABASE_DELIMITER.join((str(i) for i in message_ids))))
+                            CONST_DATABASE_DELIMITER.join((str(i) for i in message_ids)),
+                            ))
             self._conn.commit()
-        return BaseFile(file_ids, file_name, file_tags, folder_name, message_ids)
+        return BaseFile(file_ids, file_name, file_tags, file_size, folder_name, message_ids)
+
+    def copy_file(self, file_name, from_folder, to_folder, replace=False):
+        cursor = self._cursor()
+        from_folder = str(from_folder)
+        to_folder = str(to_folder)
+        file_name = str(file_name)
+        if not self._check_folder_exists(from_folder):
+            raise FolderMissingError("Missing folder: '{}'".format(from_folder))
+        if not self._check_folder_exists(to_folder):
+            raise FolderMissingError("Missing folder: '{}'".format(to_folder))
+        if not self._check_file_exists(file_name, from_folder):
+            raise FileMissingError("Missing file: '{}' in folder: '{}'".format(file_name, from_folder))
+        target_file_exists = self._check_file_exists(file_name, to_folder)
+        file = self.get_file_by_folder(file_name, from_folder)
+        if replace and target_file_exists:
+            with _lock:
+                cursor.execute(
+                    'UPDATE Files SET fileId = ?, fileName = ?, fileTags = ?, messageId = ?, fileSize = ? '
+                    'WHERE fileName == ? AND folderName == ?',
+                    (CONST_DATABASE_DELIMITER.join(file.file_ids),
+                     file.name,
+                     CONST_DATABASE_DELIMITER.join(file.tags),
+                     CONST_DATABASE_DELIMITER.join([str(m) for m in file.message_ids]),
+                     file.size,
+
+                     file_name,
+                     to_folder
+                     )
+                )
+        elif not replace and target_file_exists:
+            raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, to_folder))
+        else:
+            file.folder = to_folder
+            self.add_file(*file)
+
+    def edit_file(self, file_name, folder_name, new_file_name, new_file_tags):
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute(
+                'UPDATE Files SET fileName = (?), fileTags = (?) '
+                'WHERE fileName == (?) AND folderName == (?)',
+                (new_file_name, new_file_tags, file_name, folder_name))
+            self._conn.commit()
+
+    def remove_file(self, file_name, folder_name):
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute(
+                'DELETE FROM Files'
+                'WHERE fileName == (?) AND folderName == (?)',
+                (file_name, folder_name))
+            self._conn.commit()
+
+    def delete_file(self, file_id):
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute(
+                'DELETE FROM Files'
+                'WHERE fileId == (?)',
+                (file_id,))
+            self._conn.commit()
+
+    def edit_folder(self, folder_name, new_folder_name):
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute(
+                'UPDATE Files SET folderName = (?) '
+                'WHERE folderName == (?)',
+                (new_folder_name, folder_name))
+            cursor.execute(
+                'UPDATE Folders SET folderName = (?) '
+                'WHERE folderName == (?)',
+                (new_folder_name, folder_name)
+            )
+            self._conn.commit()
+
+    def remove_folder(self, folder_name):
+        cursor = self._cursor()
+        with _lock:
+            cursor.execute(
+                'DELETE FROM Folders'
+                'WHERE folderName == (?)',
+                (folder_name,))
+
+            cursor.execute(
+                'DELETE FROM Files'
+                'WHERE folderName == (?)',
+                (folder_name,))
+
+            self._conn.commit()
 
     def search_file(self, query):
         cursor = self._cursor()

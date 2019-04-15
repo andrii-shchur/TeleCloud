@@ -168,9 +168,7 @@ class TeleCloudClient(PyrogramClient):
 
     def authorize_user(self):
         while True:
-            print('there')
             self.phone_number = str(self.phone_callback()).strip("+")
-            print(self.phone_number)
             try:
                 r = self.send(
                     functions.auth.SendCode(
@@ -182,7 +180,6 @@ class TeleCloudClient(PyrogramClient):
                 )
             except (PhoneMigrate, NetworkMigrate) as e:
                 self.session.stop()
-                print(self.dc_id)
                 self.dc_id = e.x
 
                 self.auth_key = Auth(
@@ -210,7 +207,6 @@ class TeleCloudClient(PyrogramClient):
                 phone_registered = r.phone_registered
                 phone_code_hash = r.phone_code_hash
                 terms_of_service = r.terms_of_service
-                print('Got there')
                 if not phone_registered:
                     continue
                 else:
@@ -237,7 +233,6 @@ class TeleCloudClient(PyrogramClient):
                 phone_registered = r.phone_registered
                 phone_code_hash = r.phone_code_hash
                 terms_of_service = r.terms_of_service
-                print('Got there')
                 if not phone_registered:
                     continue
                 else:
