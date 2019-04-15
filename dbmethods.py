@@ -232,7 +232,7 @@ class Session:
             self._conn.commit()
         return BaseFile(file_ids, file_name, file_tags, file_size, folder_name, message_ids)
 
-    def copy_file(self, file_name, from_folder, to_folder, replace=False):
+    def copy_file(self, file_name, from_folder, to_folder, rewrite=False):
         cursor = self._cursor()
         from_folder = str(from_folder)
         to_folder = str(to_folder)
@@ -245,7 +245,7 @@ class Session:
             raise FileMissingError("Missing file: '{}' in folder: '{}'".format(file_name, from_folder))
         target_file_exists = self._check_file_exists(file_name, to_folder)
         file = self.get_file_by_folder(file_name, from_folder)
-        if replace and target_file_exists:
+        if rewrite and target_file_exists:
             with _lock:
                 cursor.execute(
                     'UPDATE Files SET fileId = ?, fileName = ?, fileTags = ?, messageId = ?, fileSize = ? '
@@ -260,7 +260,7 @@ class Session:
                      to_folder
                      )
                 )
-        elif not replace and target_file_exists:
+        elif not rewrite and target_file_exists:
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, to_folder))
         else:
             file.folder = to_folder
@@ -321,6 +321,10 @@ class Session:
                 (folder_name,))
 
             self._conn.commit()
+
+    def move_file(self, file_name, from_folder, to_folder, rewrite=False):
+        self.copy_file(file_name, from_folder, to_folder, rewrite)
+        self.remove_file(file_name, from_folder)
 
     def search_file(self, query):
         cursor = self._cursor()
