@@ -83,10 +83,10 @@ class PasswordForm(BaseForm):
     def __init__(self, ui_file, alert_message=''):
         super(PasswordForm, self).__init__(ui_file, alert_message)
 
-    def existing_handler(self):
-        self.window.close()
-
-    def create_handler(self):
+    def handler(self):
+        self.user_input = self.line.text()
+        if not self.user_input:
+            return
         self.window.close()
 
 
