@@ -202,7 +202,7 @@
        </layout>
       </item>
       <item>
-       <widget class="QLabel" name="label">
+       <widget class="QLabel" name="alertLabel">
         <property name="text">
          <string/>
         </property>
