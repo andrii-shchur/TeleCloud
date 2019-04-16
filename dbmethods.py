@@ -14,7 +14,7 @@ class BaseFile:
         self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
         self.name = str(file_name)
         self.tags = file_tags.split(CONST_DATABASE_DELIMITER) if isinstance(file_tags, str) else file_tags
-        self.size = size
+        self.size = int(size)
         self.folder = str(folder_name)
         self.message_ids = [
             int(i) for i in
@@ -186,10 +186,11 @@ class Session:
             self._conn.commit()
         return BaseFolder(folder_name, [])
 
-    def get_file(self, file_id: int) -> BaseFile:
+    def get_file_by_id(self, file_ids: Sequence[int]) -> BaseFile:
         cursor = self._cursor()
+        file_ids = CONST_DATABASE_DELIMITER.join([str(i) for i in file_ids])
         cursor.execute('SELECT DISTINCT * FROM FILES WHERE fileId == (?)',
-                       (file_id,))
+                       (file_ids,))
         check = cursor.fetchone()
         return BaseFile(*check) if check else None
 
@@ -277,9 +278,11 @@ class Session:
 
     def remove_file(self, file_name, folder_name):
         cursor = self._cursor()
+        if not self.check_file_exists(file_name, folder_name):
+            raise FileMissingError
         with _lock:
             cursor.execute(
-                'DELETE FROM Files'
+                'DELETE FROM Files '
                 'WHERE fileName == (?) AND folderName == (?)',
                 (file_name, folder_name))
             self._conn.commit()

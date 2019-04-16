@@ -9,6 +9,7 @@ from threading import RLock
 
 _lock = RLock()
 
+
 def get_app_instance():
     app = QApplication.instance()
     if app is None:
@@ -34,7 +35,6 @@ class BaseForm(QMainWindow):
         self.alert_label = self.window.findChild(QLabel, 'alertLabel')
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
 
-
         self.window.show()
 
     def handler(self):
@@ -46,8 +46,8 @@ class BaseForm(QMainWindow):
 
 class PhoneForm(BaseForm):
 
-    def __init__(self, ui_file):
-        super(PhoneForm, self).__init__(ui_file)
+    def __init__(self, ui_file, alert_message=''):
+        super(PhoneForm, self).__init__(ui_file, alert_message)
         self.onlyPhone = QRegExpValidator(r'\+?\d{7,15}')
         self.line.setValidator(self.onlyPhone)
 
@@ -62,8 +62,8 @@ class PhoneForm(BaseForm):
 
 class CodeForm(BaseForm):
 
-    def __init__(self, ui_file):
-        super(CodeForm, self).__init__(ui_file)
+    def __init__(self, ui_file, alert_message=''):
+        super(CodeForm, self).__init__(ui_file, alert_message)
         self.onlyCode = QRegExpValidator(r'\d{5}')
         self.line.setValidator(self.onlyCode)
 
@@ -76,9 +76,8 @@ class CodeForm(BaseForm):
 
 class PasswordForm(BaseForm):
 
-    def __init__(self, ui_file):
-        super(PasswordForm, self).__init__(ui_file)
-
+    def __init__(self, ui_file, alert_message=''):
+        super(PasswordForm, self).__init__(ui_file, alert_message)
 
     def existing_handler(self):
         self.window.close()
@@ -87,7 +86,7 @@ class PasswordForm(BaseForm):
         self.window.close()
 
 
-def phone_number(alert_message):
+def phone_number(alert_message=''):
     app = get_app_instance()
     phoneval = PhoneForm('gui/login.ui', alert_message)
     app.exec_()
@@ -96,7 +95,7 @@ def phone_number(alert_message):
     return phoneval.user_input
 
 
-def telegram_code(phone_number, alert_message):
+def telegram_code(phone_number, alert_message=''):
     app = get_app_instance()
     codeval = CodeForm('gui/confirm.ui', alert_message)
     app.exec_()
@@ -105,7 +104,7 @@ def telegram_code(phone_number, alert_message):
     return codeval.user_input
 
 
-def two_factor_auth(password_hint, alert_message):
+def two_factor_auth(password_hint, alert_message=''):
     app = get_app_instance()
     passval = PasswordForm('gui/2fa.ui', alert_message)
     app.exec_()

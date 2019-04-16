@@ -1,5 +1,4 @@
-import os, tempfile
-
+import os
 const_chunk_size = 104857600
 const_max_size = 1520435200
 
@@ -37,6 +36,8 @@ def split_into_parts(input_file):
 
 
 def rebuild_from_parts(output_file, parts_list):
+    path, file = os.path.split(output_file)
+    os.makedirs(path, exist_ok=True)
     open(output_file, 'wb').close()
     with open(output_file, "ab") as f:
         for part in parts_list:
@@ -49,16 +50,3 @@ def rebuild_from_parts(output_file, parts_list):
                 f.write(buf)
 
     return output_file
-
-
-class TempFileMaker:
-    def __enter__(self):
-        self.fp = tempfile.NamedTemporaryFile(delete=True)
-        return self.fp
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.fp.close()
-        try:
-            os.unlink(self.fp.name)
-        except FileNotFoundError:
-            pass

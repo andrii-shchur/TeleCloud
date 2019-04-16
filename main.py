@@ -147,6 +147,7 @@ if __name__ == "__main__":
     connector = None
     try:
         connector = TeleCloudApp()
+        print(True)
         if connector.ret_channel == 0:
             pass
         elif connector.ret_channel == 1:
@@ -155,7 +156,7 @@ if __name__ == "__main__":
             new_channel()
         main_window()
     except Exception as e:
-        pass
+        raise e
     finally:
         if connector:
             connector.client.stop()

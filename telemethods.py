@@ -5,9 +5,10 @@ import pyrogram
 from dbmethods import Session
 import platform
 from login import phone_number, telegram_code, two_factor_auth
-from telecloudutils import TempFileMaker, split_into_parts, rebuild_from_parts, const_max_size
+from telecloudutils import split_into_parts, rebuild_from_parts, const_max_size
 from pyrogram.errors import FloodWait
-from teleclouderrors import UploadingError, FileDuplicateError, FolderMissingError
+from teleclouderrors import UploadingError, FileDuplicateError, FileMissingError, FolderMissingError, \
+    FolderDuplicateError
 from pyrewrite import TeleCloudClient
 import os, tempfile, time, shutil
 
@@ -32,6 +33,7 @@ class TeleCloudApp:
         self.chat_title = 'TelegramCloudApp'
         self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)
         self.chat_photo = 'gui/logo.png'
+        self.local_dir = 'TeleCloudFolders/'
         self.ret_channel = self.init_login()
 
     def find_cloud_by_name(self):
@@ -39,7 +41,7 @@ class TeleCloudApp:
         for x, i in enumerate(self.client.iter_dialogs()):
             if i.chat.type == 'channel' and i.chat.title == self.chat_title:
                 full_chat = self.client.get_chat(i.chat.id)
-                if full_chat.description == self.chat_title:
+                if full_chat.description == self.chat_desc and full_chat.title == self.chat_title:
                     if not self.load_db(i.chat.id):
                         peer = self.client.resolve_peer(i.chat.id)
                         self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
@@ -48,7 +50,6 @@ class TeleCloudApp:
     def find_cloud_by_backup(self):
         total = self.client.get_dialogs(limit=0).total_count
         for x, i in enumerate(self.client.iter_dialogs()):
-            print(x, total, sep='/')
             if i.chat.type == 'channel':
                 if self.load_db(i.chat.id):
                     return self.db_session.get_channel()
@@ -68,54 +69,72 @@ class TeleCloudApp:
             for x, m in enumerate(self.client.iter_history(chat_id, limit=11)):
                 if m.document:
                     if m.document.file_name.endswith('.tgdb'):
-                        with TempFileMaker() as path:
-                            m.download(path.name)
-                            self.db_session.merge_db(path.name)
+                        with tempfile.TemporaryDirectory() as path:
+                            res = self.client.download_media(m, file_name=os.path.join(path, 'db_instance.tgdb'))
+                            self.db_session.merge_db(res)
                         return self.db_session.get_channel()
-        except Exception as E:
-            print(E)
+        except Exception as e:
+            raise e
             return None
 
     def upload_db(self):
-        with TempFileMaker() as path:
-            self.db_session.export_db(path.name)
+
         while True:
-            try:
-                old_msg = self.db_session.get_last_backup_id()
-                msg_id = self.client.send_document(self.db_session.get_channel()[0], path.name).message_id
-                self.db_session.set_last_backup_id(msg_id)
-            except pyrogram.RPCError:
-                continue
+            with tempfile.TemporaryDirectory() as path:
+                db_path = os.path.join(path, 'DATABASE_BACKUP.tgdb')
+                self.db_session.export_db(db_path)
+                try:
+                    old_msg = self.db_session.get_last_backup_id()
+                    msg_id = self.client.send_document(self.db_session.get_channel()[0], db_path).message_id
+                    self.db_session.set_last_backup_id(msg_id)
+                except pyrogram.errors.FloodWait as e:
+                    raise e
+                    time.sleep(e.x)
+                    continue
 
-            if old_msg is not None:
-                m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=[old_msg])
-                if m.messages:
-                    m.messages[0].delete() if not m.messages[0].empty else None
-            break
+                if old_msg is not None:
+                    m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=[old_msg])
+                    if m.messages:
+                        m.messages[0].delete() if not m.messages[0].empty else None
+                break
 
-    def save_file(self, file_id: str, to_folder):
-        self.client.download_media(message=file_id, file_name=to_folder)
+    def download_file(self, file_name, file_folder):
+        files = self.db_session.get_file_by_folder(file_name, file_folder)
+
+        parts_list = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for x, msg in enumerate(files.message_ids):
+                part = os.path.join(temp_dir, '{0}{0}.part'.format(x))
+                msg_obj = self.client.get_messages(
+                    chat_id=self.db_session.get_channel()[0],
+                    message_ids=[msg]
+                ).messages[0]
+                self.client.download_media(message=msg_obj, file_name=part, progress=self.upload_callback)
+                parts_list.append(part)
+            if len(files.message_ids) > 1:
+                rebuild_from_parts(os.path.join(self.local_dir, file_folder, file_name), parts_list)
+            else:
+                shutil.move(parts_list[0], os.path.join(self.local_dir, file_folder, file_name))
 
     def upload_callback(self, client: Client, current, total):
         print('{}/{}'.format(current, total))
 
-    def upload_file(self, file_name, tags, to_folder, ):
-
+    def upload_file(self, path, file_name, tags, to_folder, ):
         if not self.db_session.check_folder_exists(to_folder):
             raise FolderMissingError("Missing folder: '{}'".format(to_folder))
         if self.db_session.check_file_exists(file_name, to_folder):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, to_folder))
         file_ids = []
         message_ids = []
-        filesize = os.path.getsize(file_name)
+        filesize = os.path.getsize(path)
         temp_dir = tempfile.TemporaryDirectory()
         try:
             if filesize <= const_max_size:
 
-                file_cp = shutil.copy(file_name, temp_dir.name)
+                file_cp = shutil.copy(path, temp_dir.name)
                 file_parts = [file_cp]
             else:
-                file_cp = shutil.copy(file_name, temp_dir.name)
+                file_cp = shutil.copy(path, temp_dir.name)
                 file_parts = split_into_parts(file_cp)
 
             for file_part in file_parts:
@@ -124,11 +143,12 @@ class TeleCloudApp:
                         self.db_session.get_channel()[0],
                         file_name=os.path.basename(file_part),
                         document=file_part,
-                        progress=self.upload_callback)
+                        progress=self.upload_callback, )
                     file_ids.append(file.document.file_id)
                     message_ids.append(file.message_id)
-                except FloodWait as err:
-                    time.sleep(err.x)
+                except FloodWait as e:
+                    print(e.x)
+                    time.sleep(e.x)
 
             self.db_session.add_file(
                 file_ids=file_ids,
@@ -142,21 +162,27 @@ class TeleCloudApp:
         finally:
             temp_dir.cleanup()
 
-    def check_channel(self, channel_id):
-        if channel_id is None:
-            return False
-        chat_id, access_hash = channel_id
+    def remove_file(self, file_name, folder_name, remove_id=None):
+        file = self.db_session.get_file_by_folder(file_name, file_folder)
+        self.db_session.remove_file(file_name, folder_name)
+        if not self.db_session.get_file_by_id(file.file_ids):
+            self.client.delete_messages(self.db_session.get_channel()[0], )
 
+    def check_channel(self, channel_data):
+        if channel_data is None:
+            return False
+        chat_id, access_hash = channel_data
         try:
             chat = self.client.get_chat(chat_id)
-        except (ValueError, pyrogram.RPCError, pyrogram.errors.exceptions.bad_request_400.PeerIdInvalid) as E:
-            print(E)
+        except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid) as e:
+            print(e)
             return False
         self.load_db(chat.id)
-        if chat.title != self.chat_title or \
-                chat.description != self.chat_title:
-            self.client.set_chat_description(chat_id, self.chat_title)
+        if chat.title != self.chat_title:
             self.client.set_chat_title(chat_id, self.chat_title)
+        if chat.description != self.chat_desc:
+            self.client.set_chat_description(chat_id, self.chat_desc)
+
         return chat
 
     def init_login(self):
@@ -164,16 +190,13 @@ class TeleCloudApp:
         ret = 0
         back_executed = False
         while not self.check_channel(channel_id):
-            channel_id = self.find_cloud_by_name()
-            if channel_id:
-                channel_id = self.db_session.get_channel()
+            if self.find_cloud_by_name():
                 ret = 0
             elif not back_executed and self.find_cloud_by_backup():
                 ret = 1
-                break
             if not channel_id:
                 ret = 2
-                break
+            channel_id = self.db_session.get_channel()
         return ret
 
     def create_and_set_channel(self):

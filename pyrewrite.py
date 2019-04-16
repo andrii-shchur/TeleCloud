@@ -229,7 +229,6 @@ class TeleCloudClient(PyrogramClient):
                 continue
 
             else:
-                print(r)
                 phone_registered = r.phone_registered
                 phone_code_hash = r.phone_code_hash
                 terms_of_service = r.terms_of_service
@@ -264,7 +263,6 @@ class TeleCloudClient(PyrogramClient):
                 continue
 
             except SessionPasswordNeeded as e:
-                print(e.MESSAGE)
                 while True:
                     try:
                         r = self.send(functions.account.GetPassword())
