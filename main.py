@@ -35,6 +35,8 @@ def list_rstrip(s: str, args: Sequence[str]) -> str:
 
 def list_strip(s: str, args: Sequence[str]) -> str:
     return list_rstrip(list_lstrip(s, args), args)
+
+
 const_spaces_list = (
     '\n', ' ', '\xa0', '\u180e', '\u2000',
     '\u2001', '\u2002', '\u2003',
@@ -85,7 +87,6 @@ class UploadForm(QMainWindow):
         self.folders_list = self.window.findChild(QComboBox, 'folders_list')
         self.folders = [str(i) for i in connector.db_session.get_folders()]
         self.folders_list.addItems(self.folders)
-
 
         self.window.show()
 
@@ -209,13 +210,12 @@ class MainWindow(QMainWindow):
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
 
-
-    def refresh(self, first = False):
+    def refresh(self, first=False):
         folders_list = connector.db_session.get_folders()
-        latest_files = [i for i in self.latest_folders]
-        if not first and (set(str(i) for i in folders_list) == set(str(i) for i in self.latest_folders) and
-                          ''.join(str(i) for i in latest_files) == ''.join(str(i) for i in self.latest_files)):
-
+        latest_files = [i.ret() for i in folders_list]
+        if not first and (
+                [str(i) for i in folders_list] == [str(i) for i in self.latest_folders] and
+                ''.join(str(i) for i in latest_files) == ''.join(str(i) for i in self.latest_files)):
             return
         else:
             self.latest_folders = folders_list
@@ -254,7 +254,6 @@ def new_channel():
     app.exec_()
     if not newchannelform.check:
         client_exit()
-
 
 
 def existing_channel():
