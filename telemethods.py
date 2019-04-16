@@ -76,15 +76,14 @@ class TeleCloudApp:
                             res = self.client.download_media(m, file_name=os.path.join(path, 'db_instance.tgdb'))
                             self.db_session.merge_db(res)
                         return self.db_session.get_channel()
+
         except Exception as e:
             return None
 
     def upload_db(self):
-
         while True:
             path = TemporaryDirectory()
             try:
-
                 db_path = os.path.join(path.name, 'DATABASE_BACKUP.tgdb')
                 self.db_session.export_db(db_path)
                 try:
@@ -94,9 +93,7 @@ class TeleCloudApp:
                             if m.document.file_name.endswith('.tgdb'):
                                 old_msg = m.message_id
                                 break
-
                     while True:
-
                         try:
                             self.client.send_document(self.db_session.get_channel()[0], db_path)
                             break
@@ -142,7 +139,7 @@ class TeleCloudApp:
     def upload_callback(self, client: Client, current, total):
         print('{}/{}'.format(current, total))
 
-    def upload_file(self, path, file_name, tags, to_folder, ):
+    def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):
             raise FolderMissingError("Missing folder: '{}'".format(to_folder))
         if self.db_session.check_file_exists(file_name, to_folder):
@@ -166,7 +163,7 @@ class TeleCloudApp:
                         self.db_session.get_channel()[0],
                         file_name=os.path.basename(file_part),
                         document=file_part,
-                        progress=self.upload_callback, )
+                        progress=callback )
                     file_ids.append(file.document.file_id)
                     message_ids.append(file.message_id)
                 except FloodWait as e:
