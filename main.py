@@ -109,7 +109,8 @@ class UploadForm(QMainWindow):
         self.window.close()
 
     def upload_callback(self, client, current, total):
-        self.alert_label('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
+        pass
+        # self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
 
 
 class FolderDialog(QMainWindow):
