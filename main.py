@@ -187,14 +187,19 @@ class MainWindow(QMainWindow):
         upload_button.clicked.connect(self.upload_handler)
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         folder_create.clicked.connect(self.folder_handler)
+        search_button = self.window.findChild(QPushButton, 'search_button')
+        search_button.clicked.connect(self.search_handler)
+        self.search_line = self.window.findChild(QLineEdit, 'search_line')
+        cancel_search_button = self.window.findChild(QToolButton, 'cancel_search_button')
+        cancel_search_button.clicked.connect(self.cancel_search_handler)
 
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
         self.refresh(first=True)
-        timer = QTimer(self)
-        timer.timeout.connect(self.refresh)
-        timer.setInterval(3000)
-        timer.start()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.refresh)
+        self.timer.setInterval(3000)
+        self.timer.start()
 
         self.window.show()
 
@@ -221,26 +226,64 @@ class MainWindow(QMainWindow):
             self.latest_folders = folders_list
             self.latest_files = latest_files
         self.model = QStandardItemModel()
-        self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements'])
+        self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
         for folder in folders_list:
             parent1 = QStandardItem(folder.name)
-            parent2 = QStandardItem(str(folder.size) + ' bytes')
+            parent1.setEditable(False)
+            parent2 = QStandardItem(str(round(folder.size / 1024, 3)) + ' KB')
             parent2.setEditable(False)
             parent3 = QStandardItem(str(folder.total))
             parent3.setEditable(False)
+            parent4 = QStandardItem('Папка')
+            parent4.setEditable(False)
             for file in folder:
                 child1 = QStandardItem(file.name)
-                child2 = QStandardItem(str(file.size) + ' bytes')
+                child1.setEditable(False)
+                child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
                 child3 = QStandardItem('')
                 child3.setEditable(False)
-                parent1.appendRow([child1, child2, child3])
-            self.model.appendRow([parent1, parent2, parent3])
+                child4 = QStandardItem(os.path.splitext(file.name)[-1])
+                child4.setEditable(False)
+                parent1.appendRow([child1, child2, child3, child4])
+            self.model.appendRow([parent1, parent2, parent3, parent4])
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
+
+    def search_handler(self):
+        text = self.search_line.text()
+        found_files = connector.db_session.search_file(text.split())
+        print(found_files)
+        self.model = QStandardItemModel()
+        self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
+        self.tree_view = self.window.findChild(QTreeView, 'treeView')
+        self.tree_view.setModel(self.model)
+        self.tree_view.setUniformRowHeights(True)
+        for file in found_files:
+            parent1 = QStandardItem(file.name)
+            parent1.setEditable(False)
+            parent2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
+            parent2.setEditable(False)
+            parent3 = QStandardItem('')
+            parent3.setEditable(False)
+            parent4 = QStandardItem(os.path.splitext(file.name)[-1])
+            parent4.setEditable(False)
+            self.model.appendRow([parent1, parent2, parent3, parent4])
+            index = self.model.indexFromItem(parent1)
+            self.tree_view.expand(index)
+        self.timer.stop()
+
+    def cancel_search_handler(self):
+        self.search_line.setText('')
+        self.refresh(first=True)
+        self.dialog = QFileDialog()
+        self.timer.timeout.connect(self.refresh)
+        self.timer.setInterval(3000)
+        self.timer.start()
+
 
 
 def client_exit():
