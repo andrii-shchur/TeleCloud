@@ -1,11 +1,49 @@
 import sys
 import os
+from typing import Sequence
+import re
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 from PySide2.QtGui import *
 from telemethods import TeleCloudApp
+from teleclouderrors import FolderMissingError, FileDuplicateError
 import gui.logo
+
+
+def list_lstrip(s: str, args: Sequence[str]) -> str:
+    match = re.finditer(r'|'.join(re.escape(i) for i in args), s)
+    start = 0
+    for i in match:
+        if i.span()[0] == start:
+            start = i.span()[1]
+        else:
+            break
+    return s[start:]
+
+
+def list_rstrip(s: str, args: Sequence[str]) -> str:
+    match = re.finditer(r'|'.join(re.escape(i[::-1]) for i in args), s[::-1])
+    end = 0
+    for i in match:
+        if i.span()[0] == end:
+            end = i.span()[1]
+        else:
+            break
+    return s[:-end] if end != 0 else s
+
+
+def list_strip(s: str, args: Sequence[str]) -> str:
+    return list_rstrip(list_lstrip(s, args), args)
+const_spaces_list = (
+    '\n', ' ', '\xa0', '\u180e', '\u2000',
+    '\u2001', '\u2002', '\u2003',
+    '\u2004', '\u2005', '\u2006',
+    '\u2007', '\u2008', '\u2009',
+    '\u200a', '\u200b', '\u202f',
+    '\u205f', '\u2063', '\u3000',
+    'ㅤ', '\ufeff'
+)
 
 
 def get_app_instance():
@@ -27,8 +65,10 @@ def get_app_instance():
 
 
 class UploadForm(QMainWindow):
-    def __init__(self, ui_file):
+    def __init__(self, ui_file, file_path, filename):
         super(UploadForm, self).__init__(parent=None)
+        self.file_path = file_path
+        self.filename = filename
         ui_file = QFile(ui_file)
         ui_file.open(QFile.ReadOnly)
 
@@ -36,7 +76,31 @@ class UploadForm(QMainWindow):
         self.window = loader.load(ui_file)
         ui_file.close()
 
+        self.filename_edit = self.window.findChild(QLineEdit, 'filename_edit')
+        self.tags_line = self.window.findChild(QLineEdit, 'tagsEdit')
+        upload_file = self.window.findChild(QCommandLinkButton, 'upload_file')
+        upload_file.clicked.connect(self.handler)
+        self.alert_label = self.window.findChild(QLabel, 'alertLabel')
+        self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
+        self.folders_list = self.window.findChild(QComboBox, 'folders_list')
+        self.folders = [str(i) for i in connector.db_session.get_folders()]
+        self.folders_list.addItems(self.folders)
+
+
         self.window.show()
+
+    def handler(self):
+        tags = []
+        for i in self.tags_line.text().split(','):
+            t = list_strip(i, const_spaces_list)
+            if t:
+                tags.append(t)
+        try:
+            connector.upload_file(self.file_path, self.filename, tags, self.folders_list.currentText())
+        except FolderMissingError:
+            pass
+        except FileDuplicateError:
+            self.alert_label.setText('Файл з такою назвою вже існує')
 
 
 class FolderDialog(QMainWindow):
@@ -69,8 +133,17 @@ class NewChannelForm(QMainWindow):
         loader = QUiLoader()
         self.window = loader.load(ui_file)
         ui_file.close()
+        self.check = False
+
+        create_channel = self.window.findChild(QCommandLinkButton, 'create_channel')
+        create_channel.clicked.connect(self.handler)
 
         self.window.show()
+
+    def handler(self):
+        connector.create_and_set_channel()
+        self.check = True
+        self.window.close()
 
 
 class NewOrExistingChannelForm(QMainWindow):
@@ -132,6 +205,7 @@ class MainWindow(QMainWindow):
             # self.tree_view.setFirstColumnSpanned(folder, self.tree_view.rootIndex(), True)
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
+
         # selmod = self.tree_view.selectionModel()
         # index2 = self.model.indexFromItem(child3)
         # selmod.select(index2, QItemSelectionModel.Select | QItemSelectionModel.Rows)
@@ -141,16 +215,25 @@ class MainWindow(QMainWindow):
     def upload_handler(self):
         self.dialog = QFileDialog()
         # self.dialog.show()
-        self.filename = self.dialog.getOpenFileName()
-        print(self.filename)
+        self.file_path = self.dialog.getOpenFileName()
+        filename = os.path.basename(self.file_path[0])
+        self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
+        self.uploadform.filename_edit.setText(filename)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
 
 
+def client_exit():
+    connector.client.stop()
+    sys.exit()
+
+
 def new_channel():
     app = get_app_instance()
     newchannelform = NewChannelForm('gui/create_channel.ui')
+    if not newchannelform.check:
+        client_exit()
     app.exec_()
 
 
