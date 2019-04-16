@@ -101,6 +101,7 @@ class UploadForm(QMainWindow):
             pass
         except FileDuplicateError:
             self.alert_label.setText('Файл з такою назвою вже існує')
+        self.window.close()
 
 
 class FolderDialog(QMainWindow):
@@ -121,6 +122,7 @@ class FolderDialog(QMainWindow):
 
     def handler(self):
         connector.db_session.add_folder(self.folder_name.text())
+        connector.upload_db()
         self.window.close()
 
 
@@ -181,40 +183,22 @@ class MainWindow(QMainWindow):
         self.window = loader.load(ui_file)
         ui_file.close()
 
-        self.model = QStandardItemModel()
-        self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements'])
-        self.tree_view = self.window.findChild(QTreeView, 'treeView')
-        self.tree_view.setModel(self.model)
-        self.tree_view.setUniformRowHeights(True)
-
         upload_button = self.window.findChild(QPushButton, 'upload_button')
         upload_button.clicked.connect(self.upload_handler)
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         folder_create.clicked.connect(self.folder_handler)
 
-        for folder in connector.db_session.get_folders():
-            parent1 = QStandardItem(folder.name)
-            parent2 = QStandardItem(str(folder.size) + ' bytes')
-            parent3 = QStandardItem(str(folder.total))
-            for file in folder:
-                child1 = QStandardItem(file.name)
-                child2 = QStandardItem(str(file.size) + ' bytes')
-                child3 = QStandardItem('')
-                parent1.appendRow([child1, child2, child3])
-            self.model.appendRow([parent1, parent2, parent3])
-            # self.tree_view.setFirstColumnSpanned(folder, self.tree_view.rootIndex(), True)
-            index = self.model.indexFromItem(parent1)
-            self.tree_view.expand(index)
-
-        # selmod = self.tree_view.selectionModel()
-        # index2 = self.model.indexFromItem(child3)
-        # selmod.select(index2, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+        self.latest_folders = None
+        self.refresh()
+        timer = QTimer(self)
+        timer.timeout.connect(self.refresh)
+        timer.setInterval(3000)
+        timer.start()
 
         self.window.show()
 
     def upload_handler(self):
         self.dialog = QFileDialog()
-        # self.dialog.show()
         self.file_path = self.dialog.getOpenFileName()
         filename = os.path.basename(self.file_path[0])
         self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
@@ -223,6 +207,35 @@ class MainWindow(QMainWindow):
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
 
+    def refresh(self):
+        folders_list = connector.db_session.get_folders()
+        if folders_list == self.latest_folders:
+            return
+        else:
+            self.latest_folders = folders_list
+        self.model = QStandardItemModel()
+        self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements'])
+        print(True)
+        self.tree_view = self.window.findChild(QTreeView, 'treeView')
+        self.tree_view.setModel(self.model)
+        self.tree_view.setUniformRowHeights(True)
+        for folder in folders_list:
+            print(folder)
+            parent1 = QStandardItem(folder.name)
+            parent2 = QStandardItem(str(folder.size) + ' bytes')
+            parent2.setEditable(False)
+            parent3 = QStandardItem(str(folder.total))
+            parent3.setEditable(False)
+            for file in folder:
+                child1 = QStandardItem(file.name)
+                child2 = QStandardItem(str(file.size) + ' bytes')
+                child2.setEditable(False)
+                child3 = QStandardItem('')
+                child3.setEditable(False)
+                parent1.appendRow([child1, child2, child3])
+            self.model.appendRow([parent1, parent2, parent3])
+            index = self.model.indexFromItem(parent1)
+            self.tree_view.expand(index)
 
 def client_exit():
     connector.client.stop()
@@ -253,7 +266,6 @@ if __name__ == "__main__":
     connector = None
     try:
         connector = TeleCloudApp()
-        print(True)
         if connector.ret_channel == 0:
             pass
         elif connector.ret_channel == 1:
