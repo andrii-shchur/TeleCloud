@@ -40,13 +40,11 @@ class TeleCloudApp:
     def find_cloud_by_name(self):
         total = self.client.get_dialogs(limit=0).total_count
         for x, i in enumerate(self.client.iter_dialogs()):
-            if i.chat.type == 'channel' and i.chat.title == self.chat_title:
-                full_chat = self.client.get_chat(i.chat.id)
-                if full_chat.description == self.chat_desc and full_chat.title == self.chat_title:
-                    if not self.load_db(i.chat.id):
-                        peer = self.client.resolve_peer(i.chat.id)
-                        self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
-                    return self.db_session.get_channel()
+            if i.chat.type == 'channel' and i.chat.description == self.chat_desc:
+                if not self.load_db(i.chat.id):
+                    peer = self.client.resolve_peer(i.chat.id)
+                    self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
+                return self.db_session.get_channel()
 
     def find_cloud_by_backup(self):
         total = self.client.get_dialogs(limit=0).total_count
@@ -183,8 +181,6 @@ class TeleCloudApp:
             print(e)
             return False
         self.load_db(chat.id)
-        if chat.title != self.chat_title:
-            self.client.set_chat_title(chat_id, self.chat_title)
         if chat.description != self.chat_desc:
             self.client.set_chat_description(chat_id, self.chat_desc)
 
@@ -199,7 +195,7 @@ class TeleCloudApp:
                 ret = 0
             elif not back_executed and self.find_cloud_by_backup():
                 ret = 1
-            if not channel_id:
+            else:
                 ret = 2
             channel_id = self.db_session.get_channel()
         return ret

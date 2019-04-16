@@ -167,8 +167,14 @@ class TeleCloudClient(PyrogramClient):
         self.password_callback: callable = password
 
     def authorize_user(self):
+        self.last_alert = ''
+        self.phone_number = ''
+        self.password = ''
+        self.phone_code = ''
         while True:
-            self.phone_number = str(self.phone_callback()).strip("+")
+            self.phone_number = str(self.phone_callback(
+                predefined_number=self.phone_number,
+                alert_message=self.last_alert)).strip("+")
             try:
                 r = self.send(
                     functions.auth.SendCode(
@@ -208,24 +214,26 @@ class TeleCloudClient(PyrogramClient):
                 phone_code_hash = r.phone_code_hash
                 terms_of_service = r.terms_of_service
                 if not phone_registered:
+                    self.last_alert = 'Обліківки з таким номером телефону не існує'
                     continue
                 else:
                     break
 
-            except (PhoneNumberInvalid, PhoneNumberBanned) as e:
-                raise e
-                continue  # todo
+            except PhoneNumberInvalid:
+                self.last_alert = 'Помилковий номер телефону'
+                continue
+            except PhoneNumberBanned:
+                self.last_alert = 'Номер телефону заблоковано'
+                continue
 
             except FloodWait as e:
-                raise e
-                # todo
-                print(e.MESSAGE.format(x=e.x))
+                print('floodwait ', e.x)
                 time.sleep(e.x)
                 continue
 
             except Exception as e:
-                raise e
-                log.error(e, exc_info=True)
+                print(e.__class__)
+                self.last_alert = 'Невідома помилка'
                 continue
 
             else:
@@ -233,14 +241,15 @@ class TeleCloudClient(PyrogramClient):
                 phone_code_hash = r.phone_code_hash
                 terms_of_service = r.terms_of_service
                 if not phone_registered:
+                    self.last_alert = 'Обліківки з таким номером не існує'
                     continue
                 else:
                     break
 
         TeleCloudClient.terms_of_service_displayed = True
-
+        self.last_alert = ''
         while True:
-            self.phone_code = str(self.code_callback(self.phone_number))
+            self.phone_code = str(self.code_callback(self.phone_number, alert_message=self.last_alert))
 
             try:
 
@@ -259,15 +268,17 @@ class TeleCloudClient(PyrogramClient):
                             phone_code_hash=phone_code_hash
                         )
                     )
-            except (PhoneCodeInvalid, PhoneCodeEmpty, PhoneCodeExpired, PhoneCodeHashEmpty) as e:
+            except (PhoneCodeInvalid, PhoneCodeEmpty, PhoneCodeExpired, PhoneCodeHashEmpty):
+                self.last_alert = 'Хибний код підтвердження'
                 continue
 
             except SessionPasswordNeeded as e:
+                self.last_alert = ''
                 while True:
                     try:
                         r = self.send(functions.account.GetPassword())
 
-                        self.password = str(self.password_callback(r.hint))
+                        self.password = str(self.password_callback(r.hint, alert_message=self.last_alert))
 
                         # if self.password == "":
                         #     r = self.send(functions.auth.RequestPasswordRecovery())
@@ -290,13 +301,14 @@ class TeleCloudClient(PyrogramClient):
                             )
                         )
                     except (PasswordEmpty, PasswordRecoveryNa, PasswordHashInvalid) as e:
+                        self.last_alert = 'Хибний пароль'
                         continue
 
                     except FloodWait as e:
                         time.sleep(e.x)
                         continue
-                    except Exception as e:
-                        log.error(e, exc_info=True)
+                    except Exception:
+                        self.last_alert = 'Невідома помилка'
                         continue
                     else:
                         break
@@ -305,9 +317,8 @@ class TeleCloudClient(PyrogramClient):
                 time.sleep(e.x)
                 continue
 
-            except Exception as e:
-                log.error(e, exc_info=True)
-                continue
+            except Exception:
+                self.last_alert = 'Невідома помилка'
             else:
                 break
 

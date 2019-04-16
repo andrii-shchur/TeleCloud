@@ -93,7 +93,6 @@ class MainWindow(QMainWindow):
         self.window = loader.load(ui_file)
         ui_file.close()
 
-
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
@@ -113,9 +112,8 @@ class MainWindow(QMainWindow):
                 child3 = QStandardItem('')
                 parent1.appendRow([child1, child2, child3])
             self.model.appendRow([parent1, parent2, parent3])
-            #self.tree_view.setFirstColumnSpanned(folder, self.tree_view.rootIndex(), True)
-        index = self.model.indexFromItem(parent1)
-        self.tree_view.expand(index)
+            # self.tree_view.setFirstColumnSpanned(folder, self.tree_view.rootIndex(), True)
+
         # selmod = self.tree_view.selectionModel()
         # index2 = self.model.indexFromItem(child3)
         # selmod.select(index2, QItemSelectionModel.Select | QItemSelectionModel.Rows)
@@ -143,11 +141,11 @@ def main_window():
     mainwindow = MainWindow('gui/main.ui')
     app.exec_()
 
+
 if __name__ == "__main__":
     connector = None
     try:
         connector = TeleCloudApp()
-        print(True)
         if connector.ret_channel == 0:
             pass
         elif connector.ret_channel == 1:
