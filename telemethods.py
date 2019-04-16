@@ -162,11 +162,11 @@ class TeleCloudApp:
         finally:
             temp_dir.cleanup()
 
-    def remove_file(self, file_name, folder_name, remove_id=None):
-        file = self.db_session.get_file_by_folder(file_name, file_folder)
+    def remove_file(self, file_name, folder_name):
+        file = self.db_session.get_file_by_folder(file_name, folder_name)
         self.db_session.remove_file(file_name, folder_name)
         if not self.db_session.get_file_by_id(file.file_ids):
-            self.client.delete_messages(self.db_session.get_channel()[0], )
+            self.client.delete_messages(self.db_session.get_channel()[0], file.message_ids)
 
     def check_channel(self, channel_data):
         if channel_data is None:
