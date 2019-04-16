@@ -197,6 +197,7 @@ class TeleCloudApp:
             if self.find_cloud_by_name():
                 ret = 0
             elif not back_executed and self.find_cloud_by_backup():
+                back_executed = True
                 ret = 1
             else:
                 ret = 2
@@ -208,4 +209,8 @@ class TeleCloudApp:
         self.db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
 
     def check_connection(self):
-        pass
+        try:
+            self.client.get_me()
+            return True
+        except ConnectionError:
+            return False
