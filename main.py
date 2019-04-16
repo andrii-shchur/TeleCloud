@@ -97,7 +97,7 @@ class UploadForm(QMainWindow):
             if t:
                 tags.append(t)
         try:
-            self.connector.upload_file(self.file_path,
+            connector.upload_file(self.file_path,
                                   self.filename,
                                   tags,
                                   self.folders_list.currentText(),
