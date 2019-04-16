@@ -87,7 +87,12 @@ class TeleCloudApp:
                 self.db_session.export_db(db_path)
                 try:
                     old_msg = self.db_session.get_last_backup_id()
-                    msg_id = self.client.send_document(self.db_session.get_channel()[0], db_path).message_id
+                    while True:
+                        try:
+                            msg_id = self.client.send_document(self.db_session.get_channel()[0], db_path).message_id
+                            break
+                        except PermissionError:
+                            time.sleep(1)
                     self.db_session.set_last_backup_id(msg_id)
                 except pyrogram.errors.FloodWait as e:
                     raise e
