@@ -191,6 +191,8 @@ class MainWindow(QMainWindow):
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
         self.refresh(first=True)
+        self.refresh(True)
+        self.refresh()
         timer = QTimer(self)
         timer.timeout.connect(self.refresh)
         timer.setInterval(3000)
@@ -208,11 +210,13 @@ class MainWindow(QMainWindow):
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
 
+
     def refresh(self, first = False):
         folders_list = connector.db_session.get_folders()
         latest_files = [i for i in self.latest_folders]
         if not first and (set(str(i) for i in folders_list) == set(str(i) for i in self.latest_folders) and
                           ''.join(str(i) for i in latest_files) == ''.join(str(i) for i in self.latest_files)):
+
             return
         else:
             self.latest_folders = folders_list
@@ -238,6 +242,7 @@ class MainWindow(QMainWindow):
             self.model.appendRow([parent1, parent2, parent3])
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
+
 
 def client_exit():
     connector.client.stop()
