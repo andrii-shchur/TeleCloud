@@ -64,6 +64,9 @@
             </item>
             <item>
              <widget class="QPushButton" name="change_button">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
               <property name="text">
                <string>Редагувати</string>
               </property>

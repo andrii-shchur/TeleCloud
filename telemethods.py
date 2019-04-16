@@ -4,7 +4,7 @@ import pyrogram
 
 from dbmethods import Session
 import platform
-from login import phone_number, telegram_code, two_factor_auth
+from login import phone_number, telegram_code, two_factor_auth, PleaseWait, get_app_instance
 from telecloudutils import split_into_parts, rebuild_from_parts, const_max_size
 from pyrogram.errors import FloodWait
 from teleclouderrors import UploadingError, FileDuplicateError, FileMissingError, FolderMissingError, \
@@ -39,7 +39,12 @@ class TeleCloudApp:
         self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)
         self.chat_photo = 'gui/logo.png'
         self.local_dir = 'TeleCloudFolders/'
+        app = get_app_instance()
+        self.pleasewait = PleaseWait('gui/please_wait.ui')
+        self.pleasewait.window.show()
         self.ret_channel = self.init_login()
+        self.pleasewait.window.close()
+        app.exec_()
 
     def find_cloud_by_name(self):
         total = self.client.get_dialogs(limit=0).total_count
