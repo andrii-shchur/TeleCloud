@@ -56,10 +56,10 @@ class PhoneForm(BaseForm):
         self.line.setValidator(self.onlyPhone)
 
     def handler(self):
-        self.user_input = self.line.text()
-        if not self.user_input:
+        if not self.line.text():
             return
         else:
+            self.user_input = self.line.text()
             self.user_input = '+{}'.format(self.user_input.lstrip('+'))
         self.window.close()
 
@@ -72,9 +72,9 @@ class CodeForm(BaseForm):
         self.line.setValidator(self.onlyCode)
 
     def handler(self):
-        self.user_input = self.line.text()
-        if not self.user_input or len(self.user_input) != 5:
+        if not self.line.text() or len(self.line.text()) != 5:
             return
+        self.user_input = self.line.text()
         self.window.close()
 
 
@@ -84,9 +84,9 @@ class PasswordForm(BaseForm):
         super(PasswordForm, self).__init__(ui_file, alert_message)
 
     def handler(self):
-        self.user_input = self.line.text()
-        if not self.user_input:
+        if not self.line.text():
             return
+        self.user_input = self.line.text()
         self.window.close()
 
 

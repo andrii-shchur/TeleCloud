@@ -192,20 +192,16 @@ class TeleCloudApp:
     def init_login(self):
         channel_id = self.db_session.get_channel()
         ret = 0
-        back_executed = False
-        once_name = False
         while not self.check_channel(channel_id):
-            print(True)
-            if not once_name and self.find_cloud_by_name():
-                once_name = True
+            if self.find_cloud_by_name():
                 ret = 0
-            elif not back_executed and self.find_cloud_by_backup():
-                back_executed = True
+                break
+            elif self.find_cloud_by_backup():
                 ret = 1
+                break
             else:
                 ret = 2
                 break
-            channel_id = self.db_session.get_channel()
         return ret
 
     def create_and_set_channel(self):
@@ -218,3 +214,4 @@ class TeleCloudApp:
             return True
         except ConnectionError:
             return False
+
