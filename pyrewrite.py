@@ -12,7 +12,7 @@ from pyrogram.errors import (
 )
 from typing import Union
 from pyrogram.session import Auth, Session
-from pyrogram.client.ext import utils
+from pyrogram.client.ext import utils, Syncer
 import logging
 import time
 import pyrogram
@@ -21,7 +21,6 @@ import binascii
 import struct
 import hashlib
 import os
-from teleclouderrors import WindowClosed
 
 log = logging.getLogger(__name__)
 
@@ -167,6 +166,51 @@ class TeleCloudClient(PyrogramClient):
         self.code_callback: callable = phone_code
         self.password_callback: callable = password
 
+    def stop(self):
+        """Use this method to manually stop the Client.
+        Requires no parameters.
+
+        Raises:
+            ``ConnectionError`` in case you try to stop an already stopped Client.
+        """
+        if not self.is_started:
+            raise ConnectionError("Client is already stopped")
+
+        if self.takeout_id:
+            self.send(functions.account.FinishTakeoutSession())
+            log.warning("Takeout session {} finished".format(self.takeout_id))
+        try:
+            Syncer.remove(self)
+        except KeyError:
+            return
+        self.dispatcher.stop()
+
+        for _ in range(self.DOWNLOAD_WORKERS):
+            self.download_queue.put(None)
+
+        for i in self.download_workers_list:
+            i.join()
+
+        self.download_workers_list.clear()
+
+        for _ in range(self.UPDATES_WORKERS):
+            self.updates_queue.put(None)
+
+        for i in self.updates_workers_list:
+            i.join()
+
+        self.updates_workers_list.clear()
+
+        for i in self.media_sessions.values():
+            i.stop()
+
+        self.media_sessions.clear()
+
+        self.is_started = False
+        self.session.stop()
+
+        return self
+
     def authorize_user(self):
         self.last_alert = ''
         self.phone_number = ''
@@ -176,10 +220,12 @@ class TeleCloudClient(PyrogramClient):
             self.phone_number = self.phone_callback(
                 predefined_number=self.phone_number,
                 alert_message=self.last_alert)
-            if isinstance(self.phone_number, WindowClosed):
+
+
+            if not self.phone_number:
+                self.stop()
                 return
-            else:
-                self.phone_number = str(self.phone_number).strip("+")
+            self.phone_number = str(self.phone_number).strip("+")
             try:
                 r = self.send(
                     functions.auth.SendCode(
@@ -255,7 +301,8 @@ class TeleCloudClient(PyrogramClient):
         self.last_alert = ''
         while True:
             self.phone_code = self.code_callback(self.phone_number, alert_message=self.last_alert)
-            if isinstance(self.phone_code, WindowClosed):
+            if not self.phone_code:
+                self.stop()
                 return
             else:
                 self.phone_code = str(self.phone_code)
@@ -288,10 +335,10 @@ class TeleCloudClient(PyrogramClient):
                         r = self.send(functions.account.GetPassword())
 
                         self.password = self.password_callback(r.hint, alert_message=self.last_alert)
-                        if self.password == WindowClosed:
+                        if not self.password:
+                            self.stop()
                             return
-                        else:
-                            self.password = str(self.password)
+                        self.password = str(self.password)
 
                             # if self.password == "":
                         #     r = self.send(functions.auth.RequestPasswordRecovery())

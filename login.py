@@ -6,7 +6,6 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 import gui.logo
 from threading import RLock
-from teleclouderrors import WindowClosed
 
 _lock = RLock()
 
@@ -96,7 +95,7 @@ def phone_number(alert_message='', predefined_number=''):
     phoneval = PhoneForm('gui/login.ui', alert_message, predefined_number)
     app.exec_()
     if not hasattr(phoneval, 'user_input'):
-        return WindowClosed()
+        return False
     return phoneval.user_input
 
 
@@ -105,7 +104,7 @@ def telegram_code(phone_number, alert_message=''):
     codeval = CodeForm('gui/confirm.ui', alert_message)
     app.exec_()
     if not hasattr(codeval, 'user_input'):
-        return WindowClosed()
+        return False
     return codeval.user_input
 
 
@@ -114,5 +113,5 @@ def two_factor_auth(password_hint, alert_message=''):
     passval = PasswordForm('gui/2fa.ui', alert_message)
     app.exec_()
     if not hasattr(passval, 'user_input'):
-        return WindowClosed()
+        return False
     return passval.user_input
