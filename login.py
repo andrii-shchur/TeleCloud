@@ -33,7 +33,9 @@ class BaseForm(QMainWindow):
         enter_button = self.window.findChild(QPushButton, 'enter_button')
         enter_button.clicked.connect(self.handler)
         self.alert_label = self.window.findChild(QLabel, 'alertLabel')
+
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
+        self.alert_label.setText(alert_messasge)
 
         self.window.show()
 
@@ -46,8 +48,10 @@ class BaseForm(QMainWindow):
 
 class PhoneForm(BaseForm):
 
-    def __init__(self, ui_file, alert_message=''):
+    def __init__(self, ui_file, alert_message='', predefined_number=''):
         super(PhoneForm, self).__init__(ui_file, alert_message)
+        if predefined_number:
+            self.line.setText(predefined_number)
         self.onlyPhone = QRegExpValidator(r'\+?\d{7,15}')
         self.line.setValidator(self.onlyPhone)
 
@@ -86,9 +90,9 @@ class PasswordForm(BaseForm):
         self.window.close()
 
 
-def phone_number(alert_message=''):
+def phone_number(alert_message='', predefined_number=''):
     app = get_app_instance()
-    phoneval = PhoneForm('gui/login.ui', alert_message)
+    phoneval = PhoneForm('gui/login.ui', alert_message, predefined_number)
     app.exec_()
     if not hasattr(phoneval, 'user_input'):
         sys.exit()

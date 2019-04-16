@@ -18,15 +18,16 @@ class TeleCloudApp:
         api_id = 576793
         api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
         session_file = 'TeleCloud'
-        self.client = TeleCloudClient(session_file,
-                                      device_model=platform.system(),
-                                      app_version=__version__,
-                                      api_id=api_id,
-                                      api_hash=api_hash,
-                                      test_mode=False,
-                                      phone_code=telegram_code,
-                                      phone_number=phone_number,
-                                      password=two_factor_auth)
+        self.client = TeleCloudClient(
+            session_file,
+            device_model=platform.system(),
+            app_version=__version__,
+            api_id=api_id,
+            api_hash=api_hash,
+            test_mode=False,
+            phone_code=telegram_code,
+            phone_number=phone_number,
+            password=two_factor_auth)
 
         self.client.start()
         self.db_session: Session = Session(session_file)
@@ -109,7 +110,11 @@ class TeleCloudApp:
                     chat_id=self.db_session.get_channel()[0],
                     message_ids=[msg]
                 ).messages[0]
-                self.client.download_media(message=msg_obj, file_name=part, progress=self.upload_callback)
+                self.client.download_media(
+                    message=msg_obj,
+                    file_name=part,
+                    progress=self.upload_callback,
+                    block=False)
                 parts_list.append(part)
             if len(files.message_ids) > 1:
                 rebuild_from_parts(os.path.join(self.local_dir, file_folder, file_name), parts_list)
@@ -202,3 +207,6 @@ class TeleCloudApp:
     def create_and_set_channel(self):
         channel = self.create_cloud_channel().chats[0]
         self.db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
+
+    def check_connection(self):
+        pass
