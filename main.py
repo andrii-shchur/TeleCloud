@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         folder_create.clicked.connect(self.folder_handler)
 
-        self.latest_folders = None
+        self.latest_folders = connector.db_session.get_folders()
         self.refresh()
         timer = QTimer(self)
         timer.timeout.connect(self.refresh)
@@ -209,7 +209,7 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         folders_list = connector.db_session.get_folders()
-        if folders_list == self.latest_folders:
+        if set(str(i) for i in folders_list) == set(str(i) for i in self.latest_folders):
             return
         else:
             self.latest_folders = folders_list
@@ -245,9 +245,10 @@ def client_exit():
 def new_channel():
     app = get_app_instance()
     newchannelform = NewChannelForm('gui/create_channel.ui')
+    app.exec_()
     if not newchannelform.check:
         client_exit()
-    app.exec_()
+
 
 
 def existing_channel():
@@ -276,8 +277,4 @@ if __name__ == "__main__":
     except Exception as e:
         raise e
     finally:
-        if connector:
-            try:
-                connector.client.stop()
-            except ConnectionError:
-                pass
+        client_exit()
