@@ -97,12 +97,19 @@ class UploadForm(QMainWindow):
             if t:
                 tags.append(t)
         try:
-            connector.upload_file(self.file_path, self.filename, tags, self.folders_list.currentText())
+            connector.upload_file(self.file_path,
+                                  self.filename,
+                                  tags,
+                                  self.folders_list.currentText(),
+                                  self.upload_callback)
         except FolderMissingError:
             pass
         except FileDuplicateError:
             self.alert_label.setText('Файл з такою назвою вже існує')
         self.window.close()
+
+    def upload_callback(self, client, current, total):
+        self.alert_label('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
 
 
 class FolderDialog(QMainWindow):
@@ -283,7 +290,6 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.refresh)
         self.timer.setInterval(3000)
         self.timer.start()
-
 
 
 def client_exit():
