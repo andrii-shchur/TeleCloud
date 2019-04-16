@@ -11,7 +11,7 @@ from teleclouderrors import UploadingError, FileDuplicateError, FileMissingError
     FolderDuplicateError
 from pyrewrite import TeleCloudClient
 import os, tempfile, time, shutil
-
+from tempfile import TemporaryDirectory
 
 class TeleCloudApp:
     def __init__(self):
@@ -82,8 +82,10 @@ class TeleCloudApp:
     def upload_db(self):
 
         while True:
-            with tempfile.TemporaryDirectory() as path:
-                db_path = os.path.join(path, 'DATABASE_BACKUP.tgdb')
+            path = TemporaryDirectory()
+            try:
+
+                db_path = os.path.join(path.name, 'DATABASE_BACKUP.tgdb')
                 self.db_session.export_db(db_path)
                 try:
                     old_msg = self.db_session.get_last_backup_id()
@@ -104,7 +106,11 @@ class TeleCloudApp:
                     if m.messages:
                         m.messages[0].delete() if not m.messages[0].empty else None
                 break
-
+            finally:
+                try:
+                    path.cleanup()
+                except PermissionError:
+                    pass
     def download_file(self, file_name, file_folder):
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
