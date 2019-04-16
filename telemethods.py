@@ -13,6 +13,7 @@ from pyrewrite import TeleCloudClient
 import os, tempfile, time, shutil
 from tempfile import TemporaryDirectory
 
+
 class TeleCloudApp:
     def __init__(self):
         api_id = 576793
@@ -76,7 +77,6 @@ class TeleCloudApp:
                             self.db_session.merge_db(res)
                         return self.db_session.get_channel()
         except Exception as e:
-            raise e
             return None
 
     def upload_db(self):
@@ -88,16 +88,21 @@ class TeleCloudApp:
                 db_path = os.path.join(path.name, 'DATABASE_BACKUP.tgdb')
                 self.db_session.export_db(db_path)
                 try:
-                    old_msg = self.db_session.get_last_backup_id()
+                    old_msg = None
+                    for x, m in enumerate(self.client.iter_history(self.db_session.get_channel()[0], limit=11)):
+                        if m.document:
+                            if m.document.file_name.endswith('.tgdb'):
+                                old_msg = m.message_id
+                                break
+
                     while True:
+
                         try:
-                            msg_id = self.client.send_document(self.db_session.get_channel()[0], db_path).message_id
+                            self.client.send_document(self.db_session.get_channel()[0], db_path)
                             break
                         except PermissionError:
                             time.sleep(1)
-                    self.db_session.set_last_backup_id(msg_id)
                 except pyrogram.errors.FloodWait as e:
-                    raise e
                     time.sleep(e.x)
                     continue
 
@@ -111,6 +116,7 @@ class TeleCloudApp:
                     path.cleanup()
                 except PermissionError:
                     pass
+
     def download_file(self, file_name, file_folder):
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
@@ -225,4 +231,3 @@ class TeleCloudApp:
             return True
         except ConnectionError:
             return False
-
