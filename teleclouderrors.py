@@ -20,3 +20,6 @@ class UploadingError(Exception):
 
 class PhoneNotRegistered(Exception):
     pass
+
+class WindowClosed(Exception):
+    pass

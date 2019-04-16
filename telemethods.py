@@ -28,8 +28,11 @@ class TeleCloudApp:
             phone_code=telegram_code,
             phone_number=phone_number,
             password=two_factor_auth)
-
-        self.client.start()
+        try:
+            self.client.start()
+        except pyrogram.errors.AuthKeyUnregistered:
+            import sys
+            sys.exit()
         self.db_session: Session = Session(session_file)
         self.chat_title = 'TelegramCloudApp'
         self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)

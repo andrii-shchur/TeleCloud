@@ -21,6 +21,7 @@ import binascii
 import struct
 import hashlib
 import os
+from teleclouderrors import WindowClosed
 
 log = logging.getLogger(__name__)
 
@@ -172,9 +173,13 @@ class TeleCloudClient(PyrogramClient):
         self.password = ''
         self.phone_code = ''
         while True:
-            self.phone_number = str(self.phone_callback(
+            self.phone_number = self.phone_callback(
                 predefined_number=self.phone_number,
-                alert_message=self.last_alert)).strip("+")
+                alert_message=self.last_alert)
+            if isinstance(self.phone_number, WindowClosed):
+                return
+            else:
+                self.phone_number = str(self.phone_number).strip("+")
             try:
                 r = self.send(
                     functions.auth.SendCode(
@@ -249,7 +254,11 @@ class TeleCloudClient(PyrogramClient):
         TeleCloudClient.terms_of_service_displayed = True
         self.last_alert = ''
         while True:
-            self.phone_code = str(self.code_callback(self.phone_number, alert_message=self.last_alert))
+            self.phone_code = self.code_callback(self.phone_number, alert_message=self.last_alert)
+            if isinstance(self.phone_code, WindowClosed):
+                return
+            else:
+                self.phone_code = str(self.phone_code)
 
             try:
 
@@ -278,9 +287,13 @@ class TeleCloudClient(PyrogramClient):
                     try:
                         r = self.send(functions.account.GetPassword())
 
-                        self.password = str(self.password_callback(r.hint, alert_message=self.last_alert))
+                        self.password = self.password_callback(r.hint, alert_message=self.last_alert)
+                        if self.password == WindowClosed:
+                            return
+                        else:
+                            self.password = str(self.password)
 
-                        # if self.password == "":
+                            # if self.password == "":
                         #     r = self.send(functions.auth.RequestPasswordRecovery())
                         #
                         #     self.recovery_code = (

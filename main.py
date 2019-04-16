@@ -157,4 +157,7 @@ if __name__ == "__main__":
         raise e
     finally:
         if connector:
-            connector.client.stop()
+            try:
+                connector.client.stop()
+            except ConnectionError:
+                pass
