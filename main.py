@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         folder_create.clicked.connect(self.folder_handler)
 
         self.latest_folders = None
-        self.refresh()
+        self.refresh(True)
         timer = QTimer(self)
         timer.timeout.connect(self.refresh)
         timer.setInterval(3000)
@@ -207,20 +207,19 @@ class MainWindow(QMainWindow):
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
 
-    def refresh(self):
+    def refresh(self, first_time=False):
         folders_list = connector.db_session.get_folders()
-        if folders_list == self.latest_folders:
+        if not first_time and folders_list == self.latest_folders:
             return
         else:
             self.latest_folders = folders_list
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements'])
-        print(True)
+
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
         for folder in folders_list:
-            print(folder)
             parent1 = QStandardItem(folder.name)
             parent2 = QStandardItem(str(folder.size) + ' bytes')
             parent2.setEditable(False)
@@ -236,6 +235,7 @@ class MainWindow(QMainWindow):
             self.model.appendRow([parent1, parent2, parent3])
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
+
 
 def client_exit():
     connector.client.stop()
