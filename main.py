@@ -191,8 +191,6 @@ class MainWindow(QMainWindow):
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
         self.refresh(first=True)
-        self.refresh(True)
-        self.refresh()
         timer = QTimer(self)
         timer.timeout.connect(self.refresh)
         timer.setInterval(3000)
