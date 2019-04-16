@@ -26,6 +26,19 @@ def get_app_instance():
 #             parent_itm.setIcon(0, QIcon('assets/file.ico'))
 
 
+class UploadForm(QMainWindow):
+    def __init__(self, ui_file):
+        super(UploadForm, self).__init__(parent=None)
+        ui_file = QFile(ui_file)
+        ui_file.open(QFile.ReadOnly)
+
+        loader = QUiLoader()
+        self.window = loader.load(ui_file)
+        ui_file.close()
+
+        self.window.show()
+
+
 class FolderDialog(QMainWindow):
     def __init__(self, ui_file):
         super(FolderDialog, self).__init__(parent=None)
@@ -35,7 +48,16 @@ class FolderDialog(QMainWindow):
         loader = QUiLoader()
         self.window = loader.load(ui_file)
         ui_file.close()
+
+        self.folder_name = self.window.findChild(QLineEdit, 'folder_name')
+        create_folder = self.window.findChild(QCommandLinkButton, 'create_folder')
+        create_folder.clicked.connect(self.handler)
+
         self.window.show()
+
+    def handler(self):
+        connector.db_session.add_folder(self.folder_name.text())
+        self.window.close()
 
 
 class NewChannelForm(QMainWindow):
@@ -48,14 +70,7 @@ class NewChannelForm(QMainWindow):
         self.window = loader.load(ui_file)
         ui_file.close()
 
-        create_channel_button = self.window.findChild(QCommandLinkButton, 'create_channel')
-        create_channel_button.clicked.connect(self.handler)
         self.window.show()
-
-    def handler(self):
-        self.window.hide()
-        connector.create_and_set_channel()
-        self.window.close()
 
 
 class NewOrExistingChannelForm(QMainWindow):
@@ -99,6 +114,8 @@ class MainWindow(QMainWindow):
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
 
+        upload_button = self.window.findChild(QPushButton, 'upload_button')
+        upload_button.clicked.connect(self.upload_handler)
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         folder_create.clicked.connect(self.folder_handler)
 
@@ -113,12 +130,19 @@ class MainWindow(QMainWindow):
                 parent1.appendRow([child1, child2, child3])
             self.model.appendRow([parent1, parent2, parent3])
             # self.tree_view.setFirstColumnSpanned(folder, self.tree_view.rootIndex(), True)
-
+            index = self.model.indexFromItem(parent1)
+            self.tree_view.expand(index)
         # selmod = self.tree_view.selectionModel()
         # index2 = self.model.indexFromItem(child3)
         # selmod.select(index2, QItemSelectionModel.Select | QItemSelectionModel.Rows)
 
         self.window.show()
+
+    def upload_handler(self):
+        self.dialog = QFileDialog()
+        # self.dialog.show()
+        self.filename = self.dialog.getOpenFileName()
+        print(self.filename)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
@@ -146,6 +170,7 @@ if __name__ == "__main__":
     connector = None
     try:
         connector = TeleCloudApp()
+        print(True)
         if connector.ret_channel == 0:
             pass
         elif connector.ret_channel == 1:
@@ -157,4 +182,7 @@ if __name__ == "__main__":
         raise e
     finally:
         if connector:
-            connector.client.stop()
+            try:
+                connector.client.stop()
+            except ConnectionError:
+                pass
