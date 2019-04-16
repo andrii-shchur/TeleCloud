@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
+    <width>500</width>
     <height>850</height>
    </rect>
   </property>
@@ -25,6 +25,13 @@
        <widget class="QLineEdit" name="lineEdit"/>
       </item>
       <item>
+       <widget class="QToolButton" name="cancel_search_button">
+        <property name="text">
+         <string>X</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="search_button">
         <property name="text">
          <string>Шукати</string>
@@ -34,29 +41,40 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout">
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <layout class="QVBoxLayout" name="verticalLayout">
           <item>
-           <widget class="QPushButton" name="upload_button">
-            <property name="text">
-             <string>Новий файл</string>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QPushButton" name="upload_button">
+              <property name="text">
+               <string>Новий файл</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="folder_create">
+              <property name="text">
+               <string>Нова папка</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="change_button">
+              <property name="text">
+               <string>Редагувати</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
           <item>
-           <widget class="QPushButton" name="folder_create">
-            <property name="text">
-             <string>Нова папка</string>
-            </property>
-           </widget>
+           <widget class="QTreeView" name="treeView"/>
           </item>
          </layout>
-        </item>
-        <item>
-         <widget class="QTreeView" name="treeView"/>
         </item>
        </layout>
       </item>
@@ -69,7 +87,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>600</width>
+     <width>500</width>
      <height>26</height>
     </rect>
    </property>

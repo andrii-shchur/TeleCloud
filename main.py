@@ -202,8 +202,9 @@ class MainWindow(QMainWindow):
         self.dialog = QFileDialog()
         self.file_path = self.dialog.getOpenFileName()
         filename = os.path.basename(self.file_path[0])
-        self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
-        self.uploadform.filename_edit.setText(filename)
+        if self.file_path[0] != '':
+            self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
+            self.uploadform.filename_edit.setText(filename)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
