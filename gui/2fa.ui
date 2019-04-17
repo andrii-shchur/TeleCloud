@@ -179,6 +179,9 @@
             <property name="dragEnabled">
              <bool>false</bool>
             </property>
+            <property name="placeholderText">
+             <string>Пароль</string>
+            </property>
             <property name="clearButtonEnabled">
              <bool>false</bool>
             </property>

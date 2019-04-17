@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>600</width>
-    <height>448</height>
+    <height>439</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -168,6 +168,9 @@
           <property name="dragEnabled">
            <bool>false</bool>
           </property>
+          <property name="placeholderText">
+           <string>Номер</string>
+          </property>
           <property name="clearButtonEnabled">
            <bool>false</bool>
           </property>
@@ -293,7 +296,7 @@
        </font>
       </property>
       <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Немає облікового запису Telegram? Завантажте додаток &lt;a href=&quot;https://t.me/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;тут&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       <string>Немає обліківки Telegram? Завантаж додаток &lt;a href=&quot;https://t.me/&quot;&gt;тут&lt;/a&gt;</string>
       </property>
       <property name="indent">
        <number>0</number>
