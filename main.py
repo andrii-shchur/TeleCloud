@@ -450,7 +450,6 @@ class MainWindow(QMainWindow):
         a = set([i.folder for i in found_files])
         for folder in a:
             for file in found_files:
-                print(file)
                 if folder == file.folder:
                     parent1 = QStandardItem(folder)
                     parent1.setEditable(False)
