@@ -41,6 +41,9 @@
     </item>
     <item>
      <widget class="QCommandLinkButton" name="create_folder">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
       <property name="text">
        <string>Створити папку</string>
       </property>
