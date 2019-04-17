@@ -251,6 +251,8 @@ class MainWindow(QMainWindow):
         cancel_search_button.clicked.connect(self.cancel_search_handler)
         self.download_button = self.window.findChild(QPushButton, 'download_button')
         self.download_button.clicked.connect(self.download)
+        self.change_button = self.window.findChild(QPushButton, 'change_button')
+        self.change_button.clicked.connect(self.change_button_handler)
         self.items = []
 
         self.latest_folders = connector.db_session.get_folders()
@@ -265,11 +267,6 @@ class MainWindow(QMainWindow):
         self.timer_check.timeout.connect(self.get_checked)
         self.timer_check.setInterval(100)
         self.timer_check.start()
-
-        self.timer_select = QTimer(self)
-        self.timer_select.timeout.connect(self.get_selected)
-        self.timer_select.setInterval(1000)
-        self.timer_select.start()
 
         self.window.show()
 
@@ -369,27 +366,22 @@ class MainWindow(QMainWindow):
         self.timer.start()
         self.timer_check.start()
 
-    def get_selected(self):
-        # if self.tree_view.selectedIndexes() != []:
-        #     row = self.tree_view.selectedIndexes()[0].row()
-        #     print(self.tree_view.selectedIndexes()[0].model().item(row).parent().text())
-        #     if self.tree_view.selectedIndexes()[0].model().item(row).parent() != -1:
-        #         print(self.tree_view.selectedIndexes()[0].model().item(row).text())
-        #         #print(self.tree_view.selectedIndexes()[0].parent().model().text())
-        pass
-
     def get_checked(self):
         checked_items = []
         for i in self.items:
             if i.checkState() == Qt.Checked:
                 checked_items.append([str(i.text()), str(i.parent().text()), i])
         self.download_button.setEnabled(True if len(checked_items) > 0 else False)
+        self.change_button.setEnabled(True if len(checked_items) == 1 else False)
         return checked_items
 
     def download(self):
         for i in self.get_checked():
             i[2].setCheckState(Qt.Unchecked)
             connector.download_file(i[0], i[1])
+
+    def change_button_handler(self):
+        pass
 
 
 def client_exit():
