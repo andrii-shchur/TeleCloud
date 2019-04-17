@@ -34,7 +34,7 @@ class TeleCloudApp:
         except pyrogram.errors.AuthKeyUnregistered:
             import sys
             sys.exit()
-        self.db_session: Session = Session(session_file)
+        self.db_session: Session = Session(session_file, self.client.get_me().id)
         self.chat_title = 'TelegramCloudApp'
         self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)
         self.chat_photo = 'gui/logo.png'
@@ -44,11 +44,21 @@ class TeleCloudApp:
     def find_cloud_by_name(self):
         total = self.client.get_dialogs(limit=0).total_count
         for x, i in enumerate(self.client.iter_dialogs()):
-            if i.chat.type == 'channel' and i.chat.description == self.chat_desc:
-                if not self.load_db(i.chat.id):
-                    peer = self.client.resolve_peer(i.chat.id)
-                    self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
-                return self.db_session.get_channel()
+            while True:
+                try:
+                    if i.chat.type == 'channel':
+                        i = self.client.get_chat(i.chat.id)
+                        if i.description == self.chat_desc:
+
+                            print(i.description)
+                            if not self.load_db(i.id):
+                                peer = self.client.resolve_peer(i.id)
+                                self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
+                            return self.db_session.get_channel()
+                    break
+                except pyrogram.errors.FloodWait as e:
+                    time.sleep(e.x)
+                    continue
 
     def find_cloud_by_backup(self):
         total = self.client.get_dialogs(limit=0).total_count
@@ -117,16 +127,15 @@ class TeleCloudApp:
     def download_file(self, file_name, file_folder):
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
-
         msg_objs = self.client.get_messages(
-                    chat_id=self.db_session.get_channel()[0],
-                    message_ids=files.message_ids
-                ).messages
+            chat_id=self.db_session.get_channel()[0],
+            message_ids=files.message_ids
+        ).messages
         self.client.download_media(
-                    messages=msg_objs,
-                    file_name=os.path.join(self.local_dir, file_folder, file_name),
-                    progress=self.download_callback,
-                    block=False)
+            messages=msg_objs,
+            file_name=os.path.join(self.local_dir, file_folder, file_name),
+            progress=self.download_callback,
+            block=False)
 
     def download_callback(self, client, done, total):
         print(done, total, sep='/')
@@ -149,18 +158,15 @@ class TeleCloudApp:
                 file_cp = shutil.copy(path, temp_dir.name)
                 file_parts = split_into_parts(file_cp)
 
-            for file_part in file_parts:
-                try:
-                    file = self.client.send_named_document(
-                        self.db_session.get_channel()[0],
-                        file_name=os.path.basename(file_part),
-                        document=file_part,
-                        progress=callback )
-                    file_ids.append(file.document.file_id)
-                    message_ids.append(file.message_id)
-                except FloodWait as e:
-                    print(e.x)
-                    time.sleep(e.x)
+            file = self.client.send_named_document(
+                self.db_session.get_channel()[0],
+                file_name=os.path.basename(file_name),
+                documents=file_parts,
+                progress=callback)
+
+            for i in file:
+                file_ids.append(i.document.file_id)
+                message_ids.append(i.message_id)
 
             self.db_session.add_file(
                 file_ids=file_ids,
@@ -186,8 +192,7 @@ class TeleCloudApp:
         chat_id, access_hash = channel_data
         try:
             chat = self.client.get_chat(chat_id)
-        except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid) as e:
-            print(e)
+        except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid, KeyError) as e:
             return False
         self.load_db(chat.id)
         if chat.description != self.chat_desc:
