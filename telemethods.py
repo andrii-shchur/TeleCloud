@@ -186,6 +186,18 @@ class TeleCloudApp:
         if not self.db_session.get_file_by_id(file.file_ids):
             self.client.delete_messages(self.db_session.get_channel()[0], file.message_ids)
 
+    def remove_folder(self, folder_name):
+        files = self.db_session.get_folder(folder_name)
+        self.db_session.remove_folder(folder_name)
+        for i in files:
+            while True:
+                try:
+                    self.client.delete_messages(self.db_session.get_channel()[0], i.message_ids)
+                    break
+                except pyrogram.errors.FloodWait as e:
+                    time.sleep(e.x)
+                    continue
+    
     def check_channel(self, channel_data):
         if channel_data is None:
             return False
