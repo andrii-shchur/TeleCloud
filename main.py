@@ -92,6 +92,7 @@ class UploadForm(QMainWindow):
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
         self.folders_list = self.window.findChild(QComboBox, 'folders_list')
         self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
+        self.progress_bar = self.window.findChild(QProgressBar, 'progressBar')
         self.worker = None
         self.window.show()
         self.timer = QTimer()
@@ -129,6 +130,7 @@ class UploadForm(QMainWindow):
                 tags.append(t)
         try:
             self.main.upload_button.setEnabled(False)
+            self.alert_label.setText('Зачекайте, йде підготовка файлу...')
             self.worker = Worker(connector.upload_file, self.file_path,
                                  self.filename_edit.text(),
                                  tags,
@@ -145,7 +147,7 @@ class UploadForm(QMainWindow):
 
     def upload_callback(self, client, current, total):
         print(current, total, sep='/')
-        self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
+        self.progress_bar.setValue((current / total) * 100)
         if current == total:
             self.window.close()
 
@@ -310,6 +312,7 @@ class MainWindow(QMainWindow):
         for folder in folders_list:
             parent1 = QStandardItem(folder.name)
             parent1.setEditable(False)
+            parent1.setCheckable(True)
             parent1.setIcon(QIcon('gui/folder.ico'))
             parent2 = QStandardItem(str(round(folder.size / 1024, 3)) + ' KB')
             parent2.setEditable(False)
