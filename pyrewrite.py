@@ -486,7 +486,7 @@ class TeleCloudClient(PyrogramClient):
                                 {i.id: i for i in r.users},
                                 {i.id: i for i in r.chats}
                             ))
-                        break
+                    break
 
         return ret_updates
 

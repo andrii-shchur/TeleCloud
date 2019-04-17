@@ -10,6 +10,8 @@ from telemethods import TeleCloudApp
 from teleclouderrors import FolderMissingError, FileDuplicateError
 import gui.logo
 import json
+from login import Worker
+
 
 def list_lstrip(s: str, args: Sequence[str]) -> str:
     match = re.finditer(r'|'.join(re.escape(i) for i in args), s)
@@ -67,8 +69,9 @@ def get_app_instance():
 
 
 class UploadForm(QMainWindow):
-    def __init__(self, ui_file, file_path, filename):
+    def __init__(self, ui_file, file_path, filename, main):
         super(UploadForm, self).__init__(parent=None)
+        self.main = main
         self.file_path = file_path
         self.filename = filename
         ui_file = QFile(ui_file)
@@ -76,7 +79,9 @@ class UploadForm(QMainWindow):
 
         loader = QUiLoader()
         self.window = loader.load(ui_file)
+
         ui_file.close()
+        self.threadpool = QThreadPool()
 
         self.filename_edit = self.window.findChild(QLineEdit, 'filename_edit')
         self.filename_edit.textChanged.connect(self.check_if_exists)
@@ -87,8 +92,12 @@ class UploadForm(QMainWindow):
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
         self.folders_list = self.window.findChild(QComboBox, 'folders_list')
         self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
-
+        self.worker = None
         self.window.show()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check)
+        self.timer.setInterval(300)
+        self.timer.start()
 
     def check_if_exists(self, cur):
         if connector.db_session.check_file_exists(cur, self.folders_list.currentText()):
@@ -98,6 +107,20 @@ class UploadForm(QMainWindow):
             self.alert_label.setText('')
             self.upload_file.setEnabled(True)
 
+    def check(self):
+        thr = self.threadpool.activeThreadCount()
+        print(thr)
+        if self.worker is not None and thr == 0:
+            print('close')
+            self.ret = self.worker.ret
+            self.window.removeEventFilter(self)
+            self.window.close()
+            self.main.upload_button.setEnabled(True)
+            self.timer.stop()
+        else:
+            self.main.upload_button.setEnabled(False)
+
+
     def handler(self):
         tags = []
         for i in self.tags_line.text().split(','):
@@ -105,16 +128,20 @@ class UploadForm(QMainWindow):
             if t:
                 tags.append(t)
         try:
-            connector.upload_file(self.file_path,
-                                  self.filename_edit.text(),
-                                  tags,
-                                  self.folders_list.currentText(),
-                                  self.upload_callback)
+            self.main.upload_button.setEnabled(False)
+            self.worker = Worker(connector.upload_file, self.file_path,
+                                 self.filename_edit.text(),
+                                 tags,
+                                 self.folders_list.currentText(),
+                                 self.upload_callback)
+
+            self.threadpool.start(self.worker)
+
         except FolderMissingError:
-            pass
+            self.main.upload_button.setEnabled(False)
         except FileDuplicateError:
-            print('god hre')
             self.alert_label.setText('Файл з такою назвою вже існує')
+            self.main.upload_button.setEnabled(False)
 
     def upload_callback(self, client, current, total):
         print(current, total, sep='/')
@@ -243,19 +270,20 @@ class MainWindow(QMainWindow):
         self.timer_select.start()
 
         self.window.show()
+
     def folders_exist(self):
         if not connector.db_session.get_folders():
             self.folder_handler()
         else:
             self.upload_handler()
+
     def upload_handler(self):
         self.dialog = QFileDialog()
         self.file_path = self.dialog.getOpenFileName()
         filename = os.path.basename(self.file_path[0])
         if self.file_path[0] != '':
-            self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
+            self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename, self)
             self.uploadform.filename_edit.setText(filename)
-            self.uploadform.window.close()
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
@@ -357,7 +385,7 @@ class MainWindow(QMainWindow):
 
     def download(self):
         for i in self.get_checked():
-            #i[2].setCheckable(False)
+            i[2].setCheckState(Qt.Unchecked)
             connector.download_file(i[0], i[1])
 
 
