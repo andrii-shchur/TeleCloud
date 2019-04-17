@@ -134,8 +134,9 @@ class FolderDialog(QMainWindow):
         ui_file.close()
 
         self.folder_name = self.window.findChild(QLineEdit, 'folder_name')
-        create_folder = self.window.findChild(QCommandLinkButton, 'create_folder')
-        create_folder.clicked.connect(self.handler)
+        self.folder_name.textChanged.connect(self.empty_check)
+        self.create_folder = self.window.findChild(QCommandLinkButton, 'create_folder')
+        self.create_folder.clicked.connect(self.handler)
 
         self.window.show()
 
@@ -143,6 +144,12 @@ class FolderDialog(QMainWindow):
         connector.db_session.add_folder(self.folder_name.text())
         connector.upload_db()
         self.window.close()
+
+    def empty_check(self):
+        if self.folder_name.text() == '':
+            self.create_folder.setEnabled(False)
+        else:
+            self.create_folder.setEnabled(True)
 
 
 class NewChannelForm(QMainWindow):
@@ -266,9 +273,11 @@ class MainWindow(QMainWindow):
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
+        self.tree_view.setColumnWidth(0, 300)
         for folder in folders_list:
             parent1 = QStandardItem(folder.name)
             parent1.setEditable(False)
+            parent1.setIcon(QIcon('gui/folder.ico'))
             parent2 = QStandardItem(str(round(folder.size / 1024, 3)) + ' KB')
             parent2.setEditable(False)
             parent3 = QStandardItem(str(folder.total))
@@ -279,6 +288,7 @@ class MainWindow(QMainWindow):
                 child1 = QStandardItem(file.name)
                 child1.setEditable(False)
                 child1.setCheckable(True)
+                child1.setIcon(QIcon('gui/file.ico'))
                 self.items.append(child1)
                 child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
