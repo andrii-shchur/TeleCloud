@@ -79,16 +79,23 @@ class UploadForm(QMainWindow):
         ui_file.close()
 
         self.filename_edit = self.window.findChild(QLineEdit, 'filename_edit')
+        self.filename_edit.textChanged.connect(self.check_if_exists)
         self.tags_line = self.window.findChild(QLineEdit, 'tagsEdit')
-        upload_file = self.window.findChild(QCommandLinkButton, 'upload_file')
-        upload_file.clicked.connect(self.handler)
+        self.upload_file = self.window.findChild(QCommandLinkButton, 'upload_file')
+        self.upload_file.clicked.connect(self.handler)
         self.alert_label = self.window.findChild(QLabel, 'alertLabel')
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
         self.folders_list = self.window.findChild(QComboBox, 'folders_list')
-        self.folders = [str(i) for i in connector.db_session.get_folders()]
-        self.folders_list.addItems(self.folders)
+        self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
 
         self.window.show()
+    def check_if_exists(self, cur):
+        if connector.db_session.check_file_exists(cur, self.folders_list.currentText()):
+            self.alert_label.setText('Файл з такою назвою вже існує')
+            self.upload_file.setEnabled(False)
+        else:
+            self.alert_label.setText('')
+            self.upload_file.setEnabled(True)
 
     def handler(self):
         tags = []
@@ -98,19 +105,22 @@ class UploadForm(QMainWindow):
                 tags.append(t)
         try:
             connector.upload_file(self.file_path,
-                                  self.filename,
+                                  self.filename_edit.text(),
                                   tags,
                                   self.folders_list.currentText(),
                                   self.upload_callback)
         except FolderMissingError:
             pass
         except FileDuplicateError:
+            print('god hre')
             self.alert_label.setText('Файл з такою назвою вже існує')
-        self.window.close()
+
 
     def upload_callback(self, client, current, total):
-        pass
-        # self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
+        print(current, total, sep='/')
+        self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
+        if current == total:
+            self.window.close()
 
 class FolderDialog(QMainWindow):
     def __init__(self, ui_file):
