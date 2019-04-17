@@ -3,6 +3,7 @@ import os
 from typing import Sequence
 import re
 from PySide2.QtUiTools import QUiLoader
+from PySide2.QtXml import __loader__
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 from PySide2.QtGui import *
@@ -351,7 +352,7 @@ class MainWindow(QMainWindow):
         self.timer.start()
 
         self.timer_check = QTimer(self)
-        self.timer_check.timeout.connect(self.search_handler)
+        self.timer_check.timeout.connect(self.get_checked)
         self.timer_check.setInterval(100)
         self.timer_check.start()
 
@@ -494,6 +495,7 @@ class MainWindow(QMainWindow):
         self.search_line.setText('')
         self.refresh(first=True)
         self.dialog = QFileDialog()
+
         self.timer.timeout.connect(self.refresh)
         self.timer.setInterval(3000)
         self.timer.start()
@@ -513,7 +515,6 @@ class MainWindow(QMainWindow):
         self.checked_items = []
         for i in self.items:
             if i.checkState() == Qt.Checked:
-
                 self.checked_items.append([str(i.text()), str(i.parent().text()), i])
         self.download_button.setEnabled(True if len(self.checked_items) > 0 else False)
         return self.checked_items
