@@ -49,7 +49,7 @@ class BaseFolder:
 
 
 class Session:
-    def __init__(self, session_name: str, user_id:int):
+    def __init__(self, session_name: str, user_id: int):
         self.session_name = session_name
         cursor = self._cursor()
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
@@ -94,7 +94,6 @@ class Session:
         if f != user_id:
             self.merge_db(':memory:')
             self.__init__(session_name, user_id)
-
 
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
@@ -281,7 +280,7 @@ class Session:
             cursor.execute(
                 'UPDATE Files SET fileName = (?), fileTags = (?) '
                 'WHERE fileName == (?) AND folderName == (?)',
-                (new_file_name, new_file_tags, file_name, folder_name))
+                (new_file_name, CONST_DATABASE_DELIMITER.join(new_file_tags), file_name, folder_name))
             self._conn.commit()
 
     def remove_file(self, file_name, folder_name):
@@ -322,12 +321,12 @@ class Session:
         cursor = self._cursor()
         with _lock:
             cursor.execute(
-                'DELETE FROM Folders'
+                'DELETE FROM Folders '
                 'WHERE folderName == (?)',
                 (folder_name,))
 
             cursor.execute(
-                'DELETE FROM Files'
+                'DELETE FROM Files '
                 'WHERE folderName == (?)',
                 (folder_name,))
 

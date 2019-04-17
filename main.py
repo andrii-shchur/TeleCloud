@@ -67,6 +67,96 @@ def get_app_instance():
 #         else:
 #             parent_itm.setIcon(0, QIcon('assets/file.ico'))
 
+class EditFolder(QMainWindow):
+    def __init__(self, ui_file, folder_name):
+        super(EditFolder, self).__init__(parent=None)
+        self.folder_name = folder_name
+        ui_file = QFile(ui_file)
+        ui_file.open(QFile.ReadOnly)
+        self.old_name = folder_name
+        loader = QUiLoader()
+        self.window = loader.load(ui_file)
+        ui_file.close()
+        self.line = self.window.findChild(QLineEdit, 'foldername_edit')
+        self.line.setText(folder_name)
+        self.line.textChanged.connect(self.validate)
+        self.button_change = self.window.findChild(QPushButton, 'change_button')
+        self.button_delete = self.window.findChild(QPushButton, 'delete_button')
+        self.button_change.clicked.connect(self.change)
+        self.button_delete.clicked.connect(self.delete)
+
+        self.window.show()
+
+    def validate(self):
+        if self.old_name == self.line.text().strip():
+            self.button_change.setEnabled(False)
+        else:
+            self.button_change.setEnabled(True)
+
+    def delete(self):
+        connector.remove_folder(self.old_name)
+        connector.upload_db()
+        self.window.close()
+
+    def change(self):
+        connector.db_session.edit_folder(self.folder_name, self.line.text())
+        connector.upload_db()
+        self.window.close()
+
+
+class EditFile(QMainWindow):
+    def __init__(self, ui_file, file_name, file_tags, folder_name):
+        super(EditFile, self).__init__(parent=None)
+        self.file_name = file_name
+        self.folder_name = folder_name
+        ui_file = QFile(ui_file)
+        ui_file.open(QFile.ReadOnly)
+        self.old_name = file_name
+        self.old_tags = file_tags
+        loader = QUiLoader()
+        self.window = loader.load(ui_file)
+        ui_file.close()
+        self.line_name = self.window.findChild(QLineEdit, 'filename_edit')
+        self.line_tags = self.window.findChild(QLineEdit, 'tags_edit')
+
+        self.line_name.setText(file_name)
+        self.line_tags.setText(','.join(file_tags))
+        self.line_name.textChanged.connect(self.validate_name)
+        self.line_tags.textChanged.connect(self.validate_tags)
+        self.button_change = self.window.findChild(QPushButton, 'change_button')
+        self.button_delete = self.window.findChild(QPushButton, 'delete_button')
+        self.button_change.clicked.connect(self.change)
+        self.button_delete.clicked.connect(self.delete)
+
+        self.window.show()
+
+    def validate_name(self):
+        if self.old_name == self.line_name.text().strip() or not self.line_name.text():
+            self.button_change.setEnabled(False)
+        else:
+            self.button_change.setEnabled(True)
+
+    def validate_tags(self):
+        tags = [i.strip() for i in self.line_tags.text().split(',')]
+        if tags == self.old_tags:
+            self.button_change.setEnabled(False)
+        else:
+            self.button_change.setEnabled(True)
+
+    def delete(self):
+        connector.remove_file(self.old_name, self.folder_name)
+        connector.upload_db()
+        self.window.close()
+
+    def change(self):
+        tags = [i.strip() for i in self.line_tags.text().split(',')]
+        connector.db_session.edit_file(self.old_name,
+                                       self.folder_name,
+                                       self.line_name.text(),
+                                       tags)
+        connector.upload_db()
+        self.window.close()
+
 
 class UploadForm(QMainWindow):
     def __init__(self, ui_file, file_path, filename, main):
@@ -121,7 +211,6 @@ class UploadForm(QMainWindow):
         else:
             self.main.upload_button.setEnabled(False)
 
-
     def handler(self):
         tags = []
         for i in self.tags_line.text().split(','):
@@ -175,7 +264,8 @@ class FolderDialog(QMainWindow):
         self.window.close()
 
     def empty_check(self):
-        if self.folder_name.text() == '':
+        print(42)
+        if not self.folder_name.text().strip():
             self.create_folder.setEnabled(False)
         else:
             self.create_folder.setEnabled(True)
@@ -254,6 +344,7 @@ class MainWindow(QMainWindow):
         self.change_button = self.window.findChild(QPushButton, 'change_button')
         self.change_button.clicked.connect(self.change_button_handler)
         self.items = []
+        self.all_items = []
 
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
@@ -267,6 +358,11 @@ class MainWindow(QMainWindow):
         self.timer_check.timeout.connect(self.get_checked)
         self.timer_check.setInterval(100)
         self.timer_check.start()
+
+        self.timer_check_all = QTimer(self)
+        self.timer_check_all.timeout.connect(self.get_all_checked)
+        self.timer_check_all.setInterval(100)
+        self.timer_check_all.start()
 
         self.window.show()
 
@@ -298,6 +394,7 @@ class MainWindow(QMainWindow):
             return
         else:
             self.items = []
+            self.all_items = []
             self.latest_folders = folders_list
             self.latest_files = latest_files
         self.model = QStandardItemModel()
@@ -308,6 +405,7 @@ class MainWindow(QMainWindow):
         self.tree_view.setColumnWidth(0, 300)
         for folder in folders_list:
             parent1 = QStandardItem(folder.name)
+            self.all_items.append(parent1)
             parent1.setEditable(False)
             parent1.setCheckable(True)
             parent1.setIcon(QIcon('gui/folder.ico'))
@@ -323,6 +421,7 @@ class MainWindow(QMainWindow):
                 child1.setCheckable(True)
                 child1.setIcon(QIcon('gui/file.ico'))
                 self.items.append(child1)
+                self.all_items.append(child1)
                 child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
                 child3 = QStandardItem('')
@@ -342,6 +441,9 @@ class MainWindow(QMainWindow):
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
+        self.timer.stop()
+        self.timer_check.stop()
+        self.timer_check_all.stop()
         for file in found_files:
             parent1 = QStandardItem(file.name)
             parent1.setEditable(False)
@@ -354,8 +456,6 @@ class MainWindow(QMainWindow):
             self.model.appendRow([parent1, parent2, parent3, parent4])
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
-        self.timer.stop()
-        self.timer_check.stop()
 
     def cancel_search_handler(self):
         self.search_line.setText('')
@@ -366,12 +466,32 @@ class MainWindow(QMainWindow):
         self.timer.start()
         self.timer_check.start()
 
+        self.timer_check = QTimer(self)
+        self.timer_check.timeout.connect(self.get_checked)
+        self.timer_check.setInterval(100)
+        self.timer_check.start()
+
+        self.timer_check_all = QTimer(self)
+        self.timer_check_all.timeout.connect(self.get_all_checked)
+        self.timer_check_all.setInterval(100)
+        self.timer_check_all.start()
+
     def get_checked(self):
         checked_items = []
         for i in self.items:
             if i.checkState() == Qt.Checked:
                 checked_items.append([str(i.text()), str(i.parent().text()), i])
         self.download_button.setEnabled(True if len(checked_items) > 0 else False)
+        return checked_items
+
+    def get_all_checked(self):
+        checked_items = []
+        for i in self.all_items:
+            if i.checkState() == Qt.Checked:
+                if i.parent() is not None:
+                    checked_items.append([str(i.text()), str(i.parent().text()), i])
+                else:
+                    checked_items.append((str(i.text()), i))
         self.change_button.setEnabled(True if len(checked_items) == 1 else False)
         return checked_items
 
@@ -381,7 +501,13 @@ class MainWindow(QMainWindow):
             connector.download_file(i[0], i[1])
 
     def change_button_handler(self):
-        pass
+        item = self.get_all_checked()[0]
+        if len(item) == 2:
+            self.a = EditFolder('gui/folder_change.ui', item[0])
+        else:
+            print(item)
+            file = connector.db_session.get_file_by_folder(item[0], item[1])
+            self.a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
 
 
 def client_exit():
