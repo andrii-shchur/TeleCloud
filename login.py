@@ -1,5 +1,5 @@
 import sys
-import os
+import os, threading
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
@@ -120,15 +120,53 @@ class PasswordForm(BaseForm):
             self.enter_button.setEnabled(False)
 
 
+class Worker(QRunnable):
+    def __init__(self, func, *args, **kwargs):
+        super(Worker, self).__init__()
+        self.ret = None
+        self.args = args
+        self.kwargs = kwargs
+        self.func = func
+
+    def run(self):
+        self.ret = self.func(*self.args, **self.kwargs)
+
+
 class PleaseWait():
-    def __init__(self, ui_file):
+    def __init__(self, ui_file, func):
         super(PleaseWait, self).__init__()
         ui_file = QFile(ui_file)
         ui_file.open(QFile.ReadOnly)
+        self.func = func
 
         loader = QUiLoader()
         self.window = loader.load(ui_file)
         ui_file.close()
+        self.threadpool = QThreadPool()
+        self.value = 0
+        self.dial_1 = self.window.findChild(QDial, 'dial')
+        self.dial_2 = self.window.findChild(QDial, 'dial_2')
+        self.worker = Worker(self.func)
+        self.threadpool.start(self.worker)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check)
+        self.timer.setInterval(300)
+        self.timer.start()
+        self.window.show()
+
+    def check(self):
+        if self.value == 99:
+            self.value = 0
+            self.dial_1.setValue(self.value)
+            self.dial_2.setValue(99 - self.value)
+        else:
+            self.value += 1
+            self.dial_1.setValue(self.value)
+            self.dial_2.setValue(99 - self.value)
+        if self.threadpool.activeThreadCount() == 0:
+            self.window.close()
+            self.ret = self.worker.ret
 
 
 def phone_number(alert_message='', predefined_number=''):
@@ -156,3 +194,10 @@ def two_factor_auth(password_hint, alert_message=''):
     if not passval.check:
         return False
     return passval.user_input
+
+
+def please_wait(func):
+    app = get_app_instance()
+    a = PleaseWait('gui/please_wait.ui', func)
+    app.exec_()
+    return a.ret
