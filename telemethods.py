@@ -197,14 +197,15 @@ class TeleCloudApp:
                 except pyrogram.errors.FloodWait as e:
                     time.sleep(e.x)
                     continue
-    
+
     def check_channel(self, channel_data):
         if channel_data is None:
             return False
         chat_id, access_hash = channel_data
         try:
             chat = self.client.get_chat(chat_id)
-        except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid, KeyError) as e:
+        except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid,
+                KeyError, pyrogram.errors.ChannelPrivate) as e:
             return False
         self.load_db(chat.id)
         if chat.description != self.chat_desc:
