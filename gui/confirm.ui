@@ -196,13 +196,16 @@
      </item>
      <item>
       <widget class="QPushButton" name="enter_button">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="font">
         <font>
          <pointsize>9</pointsize>
         </font>
        </property>
        <property name="text">
-        <string>Підтвердити</string>
+        <string>Увійти</string>
        </property>
       </widget>
      </item>

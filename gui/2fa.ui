@@ -244,13 +244,16 @@
         </item>
         <item>
          <widget class="QPushButton" name="enter_button">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
           <property name="font">
            <font>
             <pointsize>9</pointsize>
            </font>
           </property>
           <property name="text">
-           <string>Підтвердити</string>
+           <string>Увійти</string>
           </property>
          </widget>
         </item>
@@ -272,16 +275,6 @@
      </layout>
     </item>
    </layout>
-  </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>600</width>
-     <height>26</height>
-    </rect>
-   </property>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>

@@ -29,9 +29,10 @@ class BaseForm(QMainWindow):
         ui_file.close()
 
         self.line = self.window.findChild(QLineEdit, 'user_input')
+        self.line.textChanged.connect(self.grey_in)
         self.line.returnPressed.connect(self.handler)
-        enter_button = self.window.findChild(QPushButton, 'enter_button')
-        enter_button.clicked.connect(self.handler)
+        self.enter_button = self.window.findChild(QPushButton, 'enter_button')
+        self.enter_button.clicked.connect(self.handler)
         self.alert_label = self.window.findChild(QLabel, 'alertLabel')
 
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
@@ -45,6 +46,9 @@ class BaseForm(QMainWindow):
             return
         # self.window.close()
 
+    def grey_in(self, cur):
+        pass
+
 
 class PhoneForm(BaseForm):
 
@@ -52,30 +56,45 @@ class PhoneForm(BaseForm):
         super(PhoneForm, self).__init__(ui_file, alert_message)
         if predefined_number:
             self.line.setText(predefined_number)
-        self.onlyPhone = QRegExpValidator(r'\+?\d{7,15}')
-        self.line.setValidator(self.onlyPhone)
+        self.validate_check = QRegExpValidator(r'\+?\d{7,15}')
+        self.line.setValidator(self.validate_check)
 
     def handler(self):
-        if not self.line.text():
+        if not self.validate_check.validate(self.line.text(), 0)[0] == self.validate_check.Acceptable:
             return
         else:
             self.user_input = self.line.text()
             self.user_input = '+{}'.format(self.user_input.lstrip('+'))
         self.window.close()
 
+    def grey_in(self, cur):
+
+        val = self.validate_check.validate(cur, 0)
+        if val[0] == self.validate_check.Acceptable:
+            self.enter_button.setEnabled(True)
+        else:
+            self.enter_button.setEnabled(False)
+
 
 class CodeForm(BaseForm):
 
     def __init__(self, ui_file, alert_message=''):
         super(CodeForm, self).__init__(ui_file, alert_message)
-        self.onlyCode = QRegExpValidator(r'\d{5}')
-        self.line.setValidator(self.onlyCode)
+        self.validate_check = QRegExpValidator(r'\d{5}')
+        self.line.setValidator(self.validate_check)
 
     def handler(self):
-        if not self.line.text() or len(self.line.text()) != 5:
+        if not self.validate_check.validate(self.line.text(), 0)[0] == self.validate_check.Acceptable:
             return
         self.user_input = self.line.text()
         self.window.close()
+
+    def grey_in(self, cur):
+        val = self.validate_check.validate(cur, 0)
+        if val[0] == self.validate_check.Acceptable:
+            self.enter_button.setEnabled(True)
+        else:
+            self.enter_button.setEnabled(False)
 
 
 class PasswordForm(BaseForm):
@@ -84,10 +103,16 @@ class PasswordForm(BaseForm):
         super(PasswordForm, self).__init__(ui_file, alert_message)
 
     def handler(self):
-        if not self.line.text():
+        if len(self.line.text()) < 1:
             return
         self.user_input = self.line.text()
         self.window.close()
+
+    def grey_in(self, cur):
+        if len(cur) > 0:
+            self.enter_button.setEnabled(True)
+        else:
+            self.enter_button.setEnabled(False)
 
 
 class PleaseWait():
@@ -126,4 +151,3 @@ def two_factor_auth(password_hint, alert_message=''):
     if not hasattr(passval, 'user_input'):
         return False
     return passval.user_input
-
