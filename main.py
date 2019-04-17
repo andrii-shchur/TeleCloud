@@ -112,7 +112,6 @@ class UploadForm(QMainWindow):
         pass
         # self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
 
-
 class FolderDialog(QMainWindow):
     def __init__(self, ui_file):
         super(FolderDialog, self).__init__(parent=None)

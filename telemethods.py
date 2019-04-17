@@ -4,7 +4,7 @@ import pyrogram
 
 from dbmethods import Session
 import platform
-from login import phone_number, telegram_code, two_factor_auth
+from login import phone_number, telegram_code, two_factor_auth, PleaseWait, get_app_instance
 from telecloudutils import split_into_parts, rebuild_from_parts, const_max_size
 from pyrogram.errors import FloodWait
 from teleclouderrors import UploadingError, FileDuplicateError, FileMissingError, FolderMissingError, \

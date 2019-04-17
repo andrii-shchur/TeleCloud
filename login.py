@@ -90,6 +90,17 @@ class PasswordForm(BaseForm):
         self.window.close()
 
 
+class PleaseWait():
+    def __init__(self, ui_file):
+        super(PleaseWait, self).__init__()
+        ui_file = QFile(ui_file)
+        ui_file.open(QFile.ReadOnly)
+
+        loader = QUiLoader()
+        self.window = loader.load(ui_file)
+        ui_file.close()
+
+
 def phone_number(alert_message='', predefined_number=''):
     app = get_app_instance()
     phoneval = PhoneForm('gui/login.ui', alert_message, predefined_number)
@@ -115,3 +126,4 @@ def two_factor_auth(password_hint, alert_message=''):
     if not hasattr(passval, 'user_input'):
         return False
     return passval.user_input
+
