@@ -344,15 +344,11 @@ class MainWindow(QMainWindow):
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
         self.refresh(first=True)
+
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.setInterval(3000)
         self.timer.start()
-
-        self.timer_check = QTimer(self)
-        self.timer_check.timeout.connect(self.get_checked)
-        self.timer_check.setInterval(100)
-        self.timer_check.start()
 
         self.timer_check = QTimer(self)
         self.timer_check.timeout.connect(self.search_handler)
@@ -434,11 +430,11 @@ class MainWindow(QMainWindow):
             self.tree_view.expand(index)
 
     def search_handler(self):
-        self.timer.stop()
-        self.timer_check.stop()
         text = self.search_line.text()
         if not text.split():
             return
+        self.timer.stop()
+        self.timer_check.stop()
         found_files = connector.db_session.search_file(text.split())
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
