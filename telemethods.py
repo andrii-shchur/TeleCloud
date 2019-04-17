@@ -47,7 +47,10 @@ class TeleCloudApp:
             while True:
                 try:
                     if i.chat.type == 'channel':
-                        i = self.client.get_chat(i.chat.id)
+                        try:
+                            i = self.client.get_chat(i.chat.id)
+                        except pyrogram.errors.ChannelPrivate:
+                            break
                         if i.description == self.chat_desc:
 
                             print(i.description)
@@ -207,6 +210,7 @@ class TeleCloudApp:
         except (ValueError, pyrogram.RPCError, pyrogram.errors.PeerIdInvalid,
                 KeyError, pyrogram.errors.ChannelPrivate) as e:
             return False
+
         self.load_db(chat.id)
         if chat.description != self.chat_desc:
             self.client.set_chat_description(chat_id, self.chat_desc)
