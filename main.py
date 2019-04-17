@@ -203,8 +203,11 @@ class MainWindow(QMainWindow):
         ui_file.close()
 
         upload_button = self.window.findChild(QPushButton, 'upload_button')
-        upload_button.clicked.connect(self.upload_handler)
         folder_create = self.window.findChild(QPushButton, 'folder_create')
+        if not connector.db_session.get_folders():
+            upload_button.clicked.connect(self.folder_handler)
+        else:
+            upload_button.clicked.connect(self.upload_handler)
         folder_create.clicked.connect(self.folder_handler)
         search_button = self.window.findChild(QPushButton, 'search_button')
         search_button.clicked.connect(self.search_handler)
@@ -242,6 +245,7 @@ class MainWindow(QMainWindow):
         if self.file_path[0] != '':
             self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
             self.uploadform.filename_edit.setText(filename)
+        self.uploadform.window.close()
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
@@ -320,12 +324,13 @@ class MainWindow(QMainWindow):
         self.timer_check.start()
 
     def get_selected(self):
-        if self.tree_view.selectedIndexes() != []:
-            row = self.tree_view.selectedIndexes()[0].row()
-            print(self.tree_view.selectedIndexes()[0].model().item(row).parent().text())
-            if self.tree_view.selectedIndexes()[0].model().item(row).parent() != -1:
-                print(self.tree_view.selectedIndexes()[0].model().item(row).text())
-                #print(self.tree_view.selectedIndexes()[0].parent().model().text())
+        # if self.tree_view.selectedIndexes() != []:
+        #     row = self.tree_view.selectedIndexes()[0].row()
+        #     print(self.tree_view.selectedIndexes()[0].model().item(row).parent().text())
+        #     if self.tree_view.selectedIndexes()[0].model().item(row).parent() != -1:
+        #         print(self.tree_view.selectedIndexes()[0].model().item(row).text())
+        #         #print(self.tree_view.selectedIndexes()[0].parent().model().text())
+        pass
 
     def get_checked(self):
         checked_items = []
@@ -337,7 +342,7 @@ class MainWindow(QMainWindow):
 
     def download(self):
         for i in self.get_checked():
-            i[2].setCheckable(False)
+            #i[2].setCheckable(False)
             connector.download_file(i[0], i[1])
 
 
