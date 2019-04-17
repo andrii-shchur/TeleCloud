@@ -209,12 +209,11 @@ class MainWindow(QMainWindow):
         self.window = loader.load(ui_file)
         ui_file.close()
 
-        upload_button = self.window.findChild(QPushButton, 'upload_button')
+        self.upload_button = self.window.findChild(QPushButton, 'upload_button')
         folder_create = self.window.findChild(QPushButton, 'folder_create')
-        if not connector.db_session.get_folders():
-            upload_button.clicked.connect(self.folder_handler)
-        else:
-            upload_button.clicked.connect(self.upload_handler)
+        print(connector.db_session.get_folders())
+        self.upload_button.clicked.connect(self.folders_exist)
+
         folder_create.clicked.connect(self.folder_handler)
         search_button = self.window.findChild(QPushButton, 'search_button')
         search_button.clicked.connect(self.search_handler)
@@ -244,7 +243,11 @@ class MainWindow(QMainWindow):
         self.timer_select.start()
 
         self.window.show()
-
+    def folders_exist(self):
+        if not connector.db_session.get_folders():
+            self.folder_handler()
+        else:
+            self.upload_handler()
     def upload_handler(self):
         self.dialog = QFileDialog()
         self.file_path = self.dialog.getOpenFileName()
@@ -252,10 +255,12 @@ class MainWindow(QMainWindow):
         if self.file_path[0] != '':
             self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename)
             self.uploadform.filename_edit.setText(filename)
-        self.uploadform.window.close()
+            self.uploadform.window.close()
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
+        if connector.db_session.get_folders():
+            self.upload_button.clicked.connect(self.upload_handler)
 
     def refresh(self, first=False):
         folders_list = connector.db_session.get_folders()
