@@ -58,6 +58,7 @@ class PhoneForm(BaseForm):
         super(PhoneForm, self).__init__(ui_file, alert_message)
         if predefined_number:
             self.line.setText(predefined_number)
+            self.enter_button.setEnabled(True)
         self.validate_check = QRegExpValidator(r'\+?\d{7,15}')
         self.line.setValidator(self.validate_check)
 

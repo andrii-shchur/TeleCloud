@@ -139,7 +139,11 @@
       </spacer>
      </item>
      <item>
-      <widget class="QLineEdit" name="user_input"/>
+      <widget class="QLineEdit" name="user_input">
+       <property name="placeholderText">
+        <string>Код </string>
+       </property>
+      </widget>
      </item>
      <item>
       <spacer name="horizontalSpacer_4">
