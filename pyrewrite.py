@@ -2,6 +2,7 @@ from pyrogram import Client as PyrogramClient, BaseClient
 from pyrogram.api import functions
 from pyrogram.api import types
 
+import threading
 from pyrogram.errors import (
     PhoneMigrate, NetworkMigrate, PhoneNumberInvalid,
     PhoneNumberUnoccupied, PhoneCodeInvalid, PhoneCodeHashEmpty,
@@ -10,7 +11,7 @@ from pyrogram.errors import (
     VolumeLocNotFound, UserMigrate, FileIdInvalid, ChannelPrivate, PhoneNumberOccupied,
     PasswordRecoveryNa, PasswordEmpty, FilePartMissing
 )
-from typing import Union
+from typing import Union, Sequence
 from pyrogram.session import Auth, Session
 from pyrogram.client.ext import utils, Syncer
 import logging
@@ -20,9 +21,13 @@ import pyrogram
 import binascii
 import struct
 import hashlib
-import os
+import os, re, mimetypes, datetime
+from threading import Event
+from telecloudutils import rebuild_from_parts
 
 log = logging.getLogger(__name__)
+
+import shutil
 
 
 def btoi(b: bytes) -> int:
@@ -165,6 +170,7 @@ class TeleCloudClient(PyrogramClient):
         self.phone_callback: callable = phone_number
         self.code_callback: callable = phone_code
         self.password_callback: callable = password
+        self.separate_files = []
 
     def stop(self):
         """Use this method to manually stop the Client.
@@ -220,7 +226,6 @@ class TeleCloudClient(PyrogramClient):
             self.phone_number = self.phone_callback(
                 predefined_number=self.phone_number,
                 alert_message=self.last_alert)
-
 
             if not self.phone_number:
                 self.stop()
@@ -340,7 +345,7 @@ class TeleCloudClient(PyrogramClient):
                             return
                         self.password = str(self.password)
 
-                            # if self.password == "":
+                        # if self.password == "":
                         #     r = self.send(functions.auth.RequestPasswordRecovery())
                         #
                         #     self.recovery_code = (
@@ -478,3 +483,221 @@ class TeleCloudClient(PyrogramClient):
                             )
         except BaseClient.StopTransmission:
             return None
+
+    def download_media(
+            self,
+            messages: Sequence[Union["pyrogram.Message", str]],
+            file_name: str = "",
+            block: bool = True,
+            progress: callable = None,
+            progress_args: tuple = ()
+    ) -> Union[str, None]:
+        """Use this method to download the media from a message.
+
+        Args:
+            message (:obj:`Message <pyrogram.Message>` | ``str``):
+                Pass a Message containing the media, the media itself (message.audio, message.video, ...) or
+                the file id as string.
+
+            file_name (``str``, *optional*):
+                A custom *file_name* to be used instead of the one provided by Telegram.
+                By default, all files are downloaded in the *downloads* folder in your working directory.
+                You can also specify a path for downloading files in a custom location: paths that end with "/"
+                are considered directories. All non-existent folders will be created automatically.
+
+            block (``bool``, *optional*):
+                Blocks the code execution until the file has been downloaded.
+                Defaults to True.
+
+            progress (``callable``):
+                Pass a callback function to view the download progress.
+                The function must take *(client, current, total, \*args)* as positional arguments (look at the section
+                below for a detailed description).
+
+            progress_args (``tuple``):
+                Extra custom arguments for the progress callback function. Useful, for example, if you want to pass
+                a chat_id and a message_id in order to edit a message with the updated progress.
+
+        Other Parameters:
+            client (:obj:`Client <pyrogram.Client>`):
+                The Client itself, useful when you want to call other API methods inside the callback function.
+
+            current (``int``):
+                The amount of bytes downloaded so far.
+
+            total (``int``):
+                The size of the file.
+
+            *args (``tuple``, *optional*):
+                Extra custom arguments as defined in the *progress_args* parameter.
+                You can either keep *\*args* or add every single extra argument in your function signature.
+
+        Returns:
+            On success, the absolute path of the downloaded file as string is returned, None otherwise.
+            In case the download is deliberately stopped with :meth:`stop_transmission`, None is returned as well.
+
+        Raises:
+            :class:`RPCError <pyrogram.RPCError>` in case of a Telegram RPC error.
+            ``ValueError`` if the message doesn't contain any downloadable media
+        """
+        error_message = "This message doesn't contain any downloadable media"
+        medias = []
+        for message in messages:
+            if isinstance(message, pyrogram.Message):
+                if message.photo:
+                    media = pyrogram.Document(
+                        file_id=message.photo.sizes[-1].file_id,
+                        file_size=message.photo.sizes[-1].file_size,
+                        mime_type="",
+                        date=message.photo.date,
+                        client=self
+                    )
+                elif message.audio:
+                    media = message.audio
+                elif message.document:
+                    media = message.document
+                elif message.video:
+                    media = message.video
+                elif message.voice:
+                    media = message.voice
+                elif message.video_note:
+                    media = message.video_note
+                elif message.sticker:
+                    media = message.sticker
+                elif message.animation:
+                    media = message.animation
+                else:
+                    raise ValueError(error_message)
+            elif isinstance(message, (
+                    pyrogram.Photo,
+                    pyrogram.PhotoSize,
+                    pyrogram.Audio,
+                    pyrogram.Document,
+                    pyrogram.Video,
+                    pyrogram.Voice,
+                    pyrogram.VideoNote,
+                    pyrogram.Sticker,
+                    pyrogram.Animation
+            )):
+                if isinstance(message, pyrogram.Photo):
+                    media = pyrogram.Document(
+                        file_id=message.sizes[-1].file_id,
+                        file_size=message.sizes[-1].file_size,
+                        mime_type="",
+                        date=message.date,
+                        client=self
+                    )
+                else:
+                    media = message
+            elif isinstance(message, str):
+                media = pyrogram.Document(
+                    file_id=message,
+                    file_size=0,
+                    mime_type="",
+                    client=self
+                )
+            else:
+                raise ValueError(error_message)
+            medias.append(media)
+
+        done = Event()
+        path = [None]
+
+        self.download_queue.put((medias, file_name, done, progress, progress_args, path))
+
+        if block:
+            done.wait()
+
+        return path[0]
+
+    def download_worker(self):
+        name = threading.current_thread().name
+        log.debug("{} started".format(name))
+
+        while True:
+            media = self.download_queue.get()
+
+            if media is None:
+                break
+
+            temp_file_path = ""
+            final_file_path = ""
+            files = []
+
+            try:
+
+                medias, file_name, done, progress, progress_args, path = media
+                directory, file_name = os.path.split(file_name)
+                for media in medias:
+                    file_id = media.file_id
+                    size = media.file_size
+
+
+
+                    try:
+                        decoded = utils.decode(file_id)
+                        fmt = "<iiqqqqi" if len(decoded) > 24 else "<iiqq"
+                        unpacked = struct.unpack(fmt, decoded)
+                    except (AssertionError, binascii.Error, struct.error):
+                        raise FileIdInvalid from None
+                    else:
+                        media_type = unpacked[0]
+                        dc_id = unpacked[1]
+                        id = unpacked[2]
+                        access_hash = unpacked[3]
+                        volume_id = None
+                        secret = None
+                        local_id = None
+
+                        if len(decoded) > 24:
+                            volume_id = unpacked[4]
+                            secret = unpacked[5]
+                            local_id = unpacked[6]
+
+                        media_type_str = TeleCloudClient.MEDIA_TYPE_ID.get(media_type, None)
+
+                        if media_type_str is None:
+                            raise FileIdInvalid("Unknown media type: {}".format(unpacked[0]))
+
+                        file_name = file_name
+
+                        temp_file_path = self.get_file(
+                            dc_id=dc_id,
+                            id=id,
+                            access_hash=access_hash,
+                            volume_id=volume_id,
+                            local_id=local_id,
+                            secret=secret,
+                            size=size,
+                            progress=progress,
+                            progress_args=progress_args
+                        )
+                        if temp_file_path:
+                            files.append(temp_file_path)
+                        else:
+                            raise ValueError('Something wrong with file')
+                final_file_path = os.path.abspath(re.sub("\\\\", "/", os.path.join(directory, file_name)))
+                if len(files) > 1:
+
+                    os.makedirs(directory, exist_ok=True)
+                    rebuild_from_parts(final_file_path, parts_list=files)
+                    print(temp_file_path, final_file_path)
+                else:
+                    print(temp_file_path, final_file_path)
+                    os.makedirs(directory, exist_ok=True)
+                    shutil.move(temp_file_path, final_file_path)
+            except Exception as e:
+                for i in files:
+                    try:
+                        os.remove(i)
+                    except OSError:
+                        pass
+            else:
+                # TODO: "" or None for faulty download, which is better?
+                # os.path methods return "" in case something does not exist, I prefer this.
+                # For now let's keep None
+                path[0] = final_file_path or None
+            finally:
+                done.set()
+
+            log.debug("{} stopped".format(name))

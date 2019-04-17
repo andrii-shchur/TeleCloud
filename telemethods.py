@@ -73,7 +73,7 @@ class TeleCloudApp:
                 if m.document:
                     if m.document.file_name.endswith('.tgdb'):
                         with tempfile.TemporaryDirectory() as path:
-                            res = self.client.download_media(m, file_name=os.path.join(path, 'db_instance.tgdb'))
+                            res = self.client.download_media([m], file_name=os.path.join(path, 'db_instance.tgdb'))
                             self.db_session.merge_db(res)
                         return self.db_session.get_channel()
 
@@ -117,27 +117,19 @@ class TeleCloudApp:
     def download_file(self, file_name, file_folder):
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
-        parts_list = []
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for x, msg in enumerate(files.message_ids):
-                part = os.path.join(temp_dir, '{0}{0}.part'.format(x))
-                msg_obj = self.client.get_messages(
-                    chat_id=self.db_session.get_channel()[0],
-                    message_ids=[msg]
-                ).messages[0]
-                self.client.download_media(
-                    message=msg_obj,
-                    file_name=part,
-                    progress=self.upload_callback,
-                    block=False)
-                parts_list.append(part)
-            if len(files.message_ids) > 1:
-                rebuild_from_parts(os.path.join(self.local_dir, file_folder, file_name), parts_list)
-            else:
-                shutil.move(parts_list[0], os.path.join(self.local_dir, file_folder, file_name))
 
-    def upload_callback(self, client: Client, current, total):
-        print('{}/{}'.format(current, total))
+        msg_objs = self.client.get_messages(
+                    chat_id=self.db_session.get_channel()[0],
+                    message_ids=files.message_ids
+                ).messages
+        self.client.download_media(
+                    messages=msg_objs,
+                    file_name=os.path.join(self.local_dir, file_folder, file_name),
+                    progress=self.download_callback,
+                    block=False)
+
+    def download_callback(self, client, done, total):
+        print(done, total, sep='/')
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):
