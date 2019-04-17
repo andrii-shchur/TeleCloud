@@ -132,15 +132,19 @@ class Worker(QRunnable):
         self.ret = self.func(*self.args, **self.kwargs)
 
 
-class PleaseWait():
+class PleaseWait(QMainWindow):
     def __init__(self, ui_file, func):
         super(PleaseWait, self).__init__()
         ui_file = QFile(ui_file)
         ui_file.open(QFile.ReadOnly)
+
         self.func = func
 
         loader = QUiLoader()
         self.window = loader.load(ui_file)
+        self.window.installEventFilter(self)
+
+        self.ret = None
         ui_file.close()
         self.threadpool = QThreadPool()
         self.value = 0
@@ -167,6 +171,12 @@ class PleaseWait():
         if self.threadpool.activeThreadCount() == 0:
             self.window.close()
             self.ret = self.worker.ret
+
+    def eventFilter(self, obj, event):
+        if obj is self.window and event.type() == QEvent.Close:
+            event.ignore()
+            return True
+        return super(PleaseWait, self).eventFilter(obj, event)
 
 
 def phone_number(alert_message='', predefined_number=''):
