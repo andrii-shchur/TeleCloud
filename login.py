@@ -19,10 +19,12 @@ def get_app_instance():
 
 class BaseForm(QMainWindow):
     def __init__(self, ui_file, alert_messasge=''):
+        self.check = False
         super(BaseForm, self).__init__(parent=None)
         self.alert_message = alert_messasge
         ui_file = QFile(ui_file)
         ui_file.open(QFile.ReadOnly)
+        self.user_input = ''
 
         loader = QUiLoader()
         self.window = loader.load(ui_file)
@@ -65,6 +67,7 @@ class PhoneForm(BaseForm):
         else:
             self.user_input = self.line.text()
             self.user_input = '+{}'.format(self.user_input.lstrip('+'))
+        self.check = True
         self.window.close()
 
     def grey_in(self, cur):
@@ -87,6 +90,7 @@ class CodeForm(BaseForm):
         if not self.validate_check.validate(self.line.text(), 0)[0] == self.validate_check.Acceptable:
             return
         self.user_input = self.line.text()
+        self.check = True
         self.window.close()
 
     def grey_in(self, cur):
@@ -106,6 +110,7 @@ class PasswordForm(BaseForm):
         if len(self.line.text()) < 1:
             return
         self.user_input = self.line.text()
+        self.check = True
         self.window.close()
 
     def grey_in(self, cur):
@@ -130,7 +135,7 @@ def phone_number(alert_message='', predefined_number=''):
     app = get_app_instance()
     phoneval = PhoneForm('gui/login.ui', alert_message, predefined_number)
     app.exec_()
-    if not hasattr(phoneval, 'user_input'):
+    if not phoneval.check:
         return False
     return phoneval.user_input
 
@@ -139,7 +144,7 @@ def telegram_code(phone_number, alert_message=''):
     app = get_app_instance()
     codeval = CodeForm('gui/confirm.ui', alert_message)
     app.exec_()
-    if not hasattr(codeval, 'user_input'):
+    if not codeval.check:
         return False
     return codeval.user_input
 
@@ -148,6 +153,6 @@ def two_factor_auth(password_hint, alert_message=''):
     app = get_app_instance()
     passval = PasswordForm('gui/2fa.ui', alert_message)
     app.exec_()
-    if not hasattr(passval, 'user_input'):
+    if not passval.check:
         return False
     return passval.user_input
