@@ -283,12 +283,10 @@ class TeleCloudClient(PyrogramClient):
                 continue
 
             except FloodWait as e:
-                print('floodwait ', e.x)
                 time.sleep(e.x)
                 continue
 
             except Exception as e:
-                print(e.__class__)
                 self.last_alert = 'Невідома помилка'
                 continue
 
@@ -685,9 +683,7 @@ class TeleCloudClient(PyrogramClient):
 
                     os.makedirs(directory, exist_ok=True)
                     rebuild_from_parts(final_file_path, parts_list=files)
-                    print(temp_file_path, final_file_path)
                 else:
-                    print(temp_file_path, final_file_path)
                     os.makedirs(directory, exist_ok=True)
                     shutil.move(temp_file_path, final_file_path)
             except Exception as e:

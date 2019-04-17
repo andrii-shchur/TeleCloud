@@ -53,7 +53,6 @@ class TeleCloudApp:
                             break
                         if i.description == self.chat_desc:
 
-                            print(i.description)
                             if not self.load_db(i.id):
                                 peer = self.client.resolve_peer(i.id)
                                 self.db_session.set_channel(int('-100' + str(peer.channel_id)), peer.access_hash)
@@ -141,7 +140,7 @@ class TeleCloudApp:
             block=False)
 
     def download_callback(self, client, done, total):
-        print(done, total, sep='/')
+        pass
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):
