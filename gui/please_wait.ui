@@ -34,8 +34,8 @@
    <string>Завантаження...</string>
   </property>
   <property name="windowIcon">
-   <iconset>
-    <normaloff>logo.png</normaloff>logo.png</iconset>
+   <iconset resource="logo.qrc">
+    <normaloff>:/:/newPrefix/logo1.png/logo.png</normaloff>:/:/newPrefix/logo1.png/logo.png</iconset>
   </property>
   <property name="iconSize">
    <size>
@@ -111,6 +111,8 @@
    </layout>
   </widget>
  </widget>
- <resources/>
+ <resources>
+  <include location="logo.qrc"/>
+ </resources>
  <connections/>
 </ui>

@@ -89,6 +89,7 @@ class UploadForm(QMainWindow):
         self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
 
         self.window.show()
+
     def check_if_exists(self, cur):
         if connector.db_session.check_file_exists(cur, self.folders_list.currentText()):
             self.alert_label.setText('Файл з такою назвою вже існує')
@@ -115,12 +116,12 @@ class UploadForm(QMainWindow):
             print('god hre')
             self.alert_label.setText('Файл з такою назвою вже існує')
 
-
     def upload_callback(self, client, current, total):
         print(current, total, sep='/')
         self.alert_label.setText('{} завершено з {}'.format(round(current / 1024, 3), round(total / 1024, 3)))
         if current == total:
             self.window.close()
+
 
 class FolderDialog(QMainWindow):
     def __init__(self, ui_file):
@@ -210,6 +211,9 @@ class MainWindow(QMainWindow):
         self.search_line = self.window.findChild(QLineEdit, 'search_line')
         cancel_search_button = self.window.findChild(QToolButton, 'cancel_search_button')
         cancel_search_button.clicked.connect(self.cancel_search_handler)
+        self.download_button = self.window.findChild(QPushButton, 'download_button')
+        self.download_button.clicked.connect(self.download)
+        self.items = []
 
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
@@ -218,6 +222,16 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.refresh)
         self.timer.setInterval(3000)
         self.timer.start()
+
+        self.timer_check = QTimer(self)
+        self.timer_check.timeout.connect(self.get_checked)
+        self.timer_check.setInterval(100)
+        self.timer_check.start()
+
+        self.timer_select = QTimer(self)
+        self.timer_select.timeout.connect(self.get_selected)
+        self.timer_select.setInterval(1000)
+        self.timer_select.start()
 
         self.window.show()
 
@@ -240,6 +254,7 @@ class MainWindow(QMainWindow):
                 ''.join(str(i) for i in latest_files) == ''.join(str(i) for i in self.latest_files)):
             return
         else:
+            self.items = []
             self.latest_folders = folders_list
             self.latest_files = latest_files
         self.model = QStandardItemModel()
@@ -259,6 +274,8 @@ class MainWindow(QMainWindow):
             for file in folder:
                 child1 = QStandardItem(file.name)
                 child1.setEditable(False)
+                child1.setCheckable(True)
+                self.items.append(child1)
                 child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
                 child3 = QStandardItem('')
@@ -273,7 +290,6 @@ class MainWindow(QMainWindow):
     def search_handler(self):
         text = self.search_line.text()
         found_files = connector.db_session.search_file(text.split())
-        print(found_files)
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
@@ -292,6 +308,7 @@ class MainWindow(QMainWindow):
             index = self.model.indexFromItem(parent1)
             self.tree_view.expand(index)
         self.timer.stop()
+        self.timer_check.stop()
 
     def cancel_search_handler(self):
         self.search_line.setText('')
@@ -300,6 +317,28 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.refresh)
         self.timer.setInterval(3000)
         self.timer.start()
+        self.timer_check.start()
+
+    def get_selected(self):
+        if self.tree_view.selectedIndexes() != []:
+            row = self.tree_view.selectedIndexes()[0].row()
+            print(self.tree_view.selectedIndexes()[0].model().item(row).parent().text())
+            if self.tree_view.selectedIndexes()[0].model().item(row).parent() != -1:
+                print(self.tree_view.selectedIndexes()[0].model().item(row).text())
+                #print(self.tree_view.selectedIndexes()[0].parent().model().text())
+
+    def get_checked(self):
+        checked_items = []
+        for i in self.items:
+            if i.checkState() == Qt.Checked:
+                checked_items.append([str(i.text()), str(i.parent().text()), i])
+        self.download_button.setEnabled(True if len(checked_items) > 0 else False)
+        return checked_items
+
+    def download(self):
+        for i in self.get_checked():
+            i[2].setCheckable(False)
+            connector.download_file(i[0], i[1])
 
 
 def client_exit():

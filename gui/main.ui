@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>500</width>
+    <width>700</width>
     <height>850</height>
    </rect>
   </property>
@@ -18,7 +18,7 @@
     <normaloff>:/:/newPrefix/logo1.png/logo.png</normaloff>:/:/newPrefix/logo1.png/logo.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
+   <layout class="QVBoxLayout" name="verticalLayout">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
@@ -41,47 +41,45 @@
      </layout>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout_4">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <item>
-         <layout class="QVBoxLayout" name="verticalLayout">
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_2">
-            <item>
-             <widget class="QPushButton" name="upload_button">
-              <property name="text">
-               <string>Новий файл</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="folder_create">
-              <property name="text">
-               <string>Нова папка</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="change_button">
-              <property name="enabled">
-               <bool>false</bool>
-              </property>
-              <property name="text">
-               <string>Редагувати</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QTreeView" name="treeView"/>
-          </item>
-         </layout>
-        </item>
-       </layout>
+       <widget class="QPushButton" name="upload_button">
+        <property name="text">
+         <string>Новий файл</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="folder_create">
+        <property name="text">
+         <string>Нова папка</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="change_button">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Редагувати</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="download_button">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="text">
+         <string>Скачати файли</string>
+        </property>
+       </widget>
       </item>
      </layout>
+    </item>
+    <item>
+     <widget class="QTreeView" name="treeView"/>
     </item>
    </layout>
   </widget>
@@ -90,7 +88,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>500</width>
+     <width>700</width>
      <height>26</height>
     </rect>
    </property>
