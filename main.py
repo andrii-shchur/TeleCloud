@@ -200,9 +200,7 @@ class UploadForm(QMainWindow):
 
     def check(self):
         thr = self.threadpool.activeThreadCount()
-        print(thr)
         if self.worker is not None and thr == 0:
-            print('close')
             self.ret = self.worker.ret
             self.window.removeEventFilter(self)
             self.window.close()
@@ -235,7 +233,6 @@ class UploadForm(QMainWindow):
             self.main.upload_button.setEnabled(False)
 
     def upload_callback(self, client, current, total):
-        print(current, total, sep='/')
         self.progress_bar.setValue((current / total) * 100)
         if current == total:
             self.window.close()
@@ -264,7 +261,6 @@ class FolderDialog(QMainWindow):
         self.window.close()
 
     def empty_check(self):
-        print(42)
         if not self.folder_name.text().strip():
             self.create_folder.setEnabled(False)
         else:
@@ -330,7 +326,6 @@ class MainWindow(QMainWindow):
 
         self.upload_button = self.window.findChild(QPushButton, 'upload_button')
         folder_create = self.window.findChild(QPushButton, 'folder_create')
-        print(connector.db_session.get_folders())
         self.upload_button.clicked.connect(self.folders_exist)
 
         folder_create.clicked.connect(self.folder_handler)
@@ -505,7 +500,6 @@ class MainWindow(QMainWindow):
         if len(item) == 2:
             self.a = EditFolder('gui/folder_change.ui', item[0])
         else:
-            print(item)
             file = connector.db_session.get_file_by_folder(item[0], item[1])
             self.a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
 
