@@ -9,7 +9,7 @@ from PySide2.QtGui import *
 from telemethods import TeleCloudApp
 from teleclouderrors import FolderMissingError, FileDuplicateError
 import gui.logo
-
+import json
 
 def list_lstrip(s: str, args: Sequence[str]) -> str:
     match = re.finditer(r'|'.join(re.escape(i) for i in args), s)
@@ -374,7 +374,12 @@ def main_window():
 if __name__ == "__main__":
     connector = None
     try:
-        connector = TeleCloudApp()
+        try:
+            connector = TeleCloudApp()
+        except json.JSONDecodeError:
+            os.remove('TeleCloud.session')
+            connector = TeleCloudApp()
+
         if connector.ret_channel == 0:
             pass
         elif connector.ret_channel == 1:

@@ -49,7 +49,7 @@ class BaseFolder:
 
 
 class Session:
-    def __init__(self, session_name: str):
+    def __init__(self, session_name: str, user_id:int):
         self.session_name = session_name
         cursor = self._cursor()
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
@@ -60,13 +60,14 @@ class Session:
                     """
                 CREATE TABLE IF NOT EXISTS Userdata(
                     versionId INTEGER,
+                    userId INTEGER,
                     channelId INTEGER,
                     channelHash INTEGER,
                     lastBackupMsgId INTEGER 
                 )
                 """)
 
-                cursor.execute('INSERT INTO userData VALUES((?), (?), (?), (?))', (0.1, None, None, None))
+                cursor.execute('INSERT INTO userData VALUES((?), (?), (?), (?), (?))', (0.1, user_id, None, None, None))
 
                 cursor.execute(
                     """
@@ -87,6 +88,13 @@ class Session:
                 )
                 """)
                 self._conn.commit()
+
+        f = self._cursor().execute('SELECT userId FROM Userdata').fetchone()
+        f = int(f[0]) if f is not None else None
+        if f != user_id:
+            self.merge_db(':memory:')
+            self.__init__(session_name, user_id)
+
 
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""

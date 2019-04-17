@@ -399,7 +399,7 @@ class TeleCloudClient(PyrogramClient):
     def send_named_document(
             self,
             chat_id: Union[int, str],
-            document: str,
+            documents: Sequence[str],
             file_name: str,
             thumb: str = None,
             caption: str = "",
@@ -414,50 +414,55 @@ class TeleCloudClient(PyrogramClient):
             ] = None,
             progress: callable = None,
             progress_args: tuple = ()
-    ) -> Union["pyrogram.Message", None]:
+    ) -> Union[Sequence["pyrogram.Message"], None]:
         file = None
         style = self.html if parse_mode.lower() == "html" else self.markdown
-
-        try:
-            if os.path.exists(document):
-                thumb = None if thumb is None else self.save_file(thumb)
-                file = self.save_file(document, progress=progress, progress_args=progress_args)
-                media = types.InputMediaUploadedDocument(
-                    mime_type="application/zip",
-                    file=file,
-                    thumb=thumb,
-                    attributes=[
-                        types.DocumentAttributeFilename(file_name=file_name)
-                    ]
-                )
-            elif document.startswith("http"):
-                media = types.InputMediaDocumentExternal(
-                    url=document
-                )
-            else:
-                try:
-                    decoded = utils.decode(document)
-                    fmt = "<iiqqqqi" if len(decoded) > 24 else "<iiqq"
-                    unpacked = struct.unpack(fmt, decoded)
-                except (AssertionError, binascii.Error, struct.error):
-                    raise FileIdInvalid from None
-                else:
-                    if unpacked[0] not in (5, 10):
-                        media_type = BaseClient.MEDIA_TYPE_ID.get(unpacked[0], None)
-
-                        if media_type:
-                            raise FileIdInvalid("The file_id belongs to a {}".format(media_type))
-                        else:
-                            raise FileIdInvalid("Unknown media type: {}".format(unpacked[0]))
-
-                    media = types.InputMediaDocument(
-                        id=types.InputDocument(
-                            id=unpacked[2],
-                            access_hash=unpacked[3],
-                            file_reference=b""
-                        )
+        medias = []
+        for document in documents:
+            try:
+                if os.path.exists(document):
+                    thumb = None if thumb is None else self.save_file(thumb)
+                    file = self.save_file(document, progress=progress, progress_args=progress_args)
+                    media = types.InputMediaUploadedDocument(
+                        mime_type="application/zip",
+                        file=file,
+                        thumb=thumb,
+                        attributes=[
+                            types.DocumentAttributeFilename(file_name=file_name)
+                        ]
                     )
+                elif document.startswith("http"):
+                    media = types.InputMediaDocumentExternal(
+                        url=document
+                    )
+                else:
+                    try:
+                        decoded = utils.decode(document)
+                        fmt = "<iiqqqqi" if len(decoded) > 24 else "<iiqq"
+                        unpacked = struct.unpack(fmt, decoded)
+                    except (AssertionError, binascii.Error, struct.error):
+                        raise FileIdInvalid from None
+                    else:
+                        if unpacked[0] not in (5, 10):
+                            media_type = BaseClient.MEDIA_TYPE_ID.get(unpacked[0], None)
 
+                            if media_type:
+                                raise FileIdInvalid("The file_id belongs to a {}".format(media_type))
+                            else:
+                                raise FileIdInvalid("Unknown media type: {}".format(unpacked[0]))
+
+                        media = types.InputMediaDocument(
+                            id=types.InputDocument(
+                                id=unpacked[2],
+                                access_hash=unpacked[3],
+                                file_reference=b""
+                            )
+                        )
+                medias.append(media)
+            except BaseClient.StopTransmission:
+                return None
+        ret_updates = []
+        for x, media in enumerate(medias):
             while True:
                 try:
                     r = self.send(
@@ -472,17 +477,18 @@ class TeleCloudClient(PyrogramClient):
                         )
                     )
                 except FilePartMissing as e:
-                    self.save_file(document, file_id=file.id, file_part=e.x)
+                    self.save_file(documents[x], file_id=file.id, file_part=e.x)
                 else:
                     for i in r.updates:
                         if isinstance(i, (types.UpdateNewMessage, types.UpdateNewChannelMessage)):
-                            return pyrogram.Message._parse(
+                            ret_updates.append(pyrogram.Message._parse(
                                 self, i.message,
                                 {i.id: i for i in r.users},
                                 {i.id: i for i in r.chats}
-                            )
-        except BaseClient.StopTransmission:
-            return None
+                            ))
+                        break
+
+        return ret_updates
 
     def download_media(
             self,
@@ -631,8 +637,6 @@ class TeleCloudClient(PyrogramClient):
                 for media in medias:
                     file_id = media.file_id
                     size = media.file_size
-
-
 
                     try:
                         decoded = utils.decode(file_id)
