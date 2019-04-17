@@ -268,6 +268,11 @@ class MainWindow(QMainWindow):
         self.timer_check.setInterval(100)
         self.timer_check.start()
 
+        self.timer_check = QTimer(self)
+        self.timer_check.timeout.connect(self.search_handler)
+        self.timer_check.setInterval(100)
+        self.timer_check.start()
+
         self.window.show()
 
     def folders_exist(self):
@@ -335,27 +340,49 @@ class MainWindow(QMainWindow):
             self.tree_view.expand(index)
 
     def search_handler(self):
+        self.timer.stop()
+        self.timer_check.stop()
         text = self.search_line.text()
+        if not text.split():
+            return
         found_files = connector.db_session.search_file(text.split())
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
+        self.items = []
+        a = set([i.folder for i in found_files])
+        for folder in a:
+            for file in found_files:
+                print(file)
+                if folder == file.folder:
+                    parent1 = QStandardItem(folder)
+                    parent1.setEditable(False)
+                    parent1.setCheckable(True)
+                    parent1.setIcon(QIcon('gui/folder.ico'))
+                    parent2 = QStandardItem(str(round(connector.db_session.get_folder(folder).size / 1024, 3)) + ' KB')
+                    parent2.setEditable(False)
+                    parent3 = QStandardItem(str(connector.db_session.get_folder(folder).total))
+                    parent3.setEditable(False)
+                    parent4 = QStandardItem('Папка')
+                    parent4.setEditable(False)
         for file in found_files:
-            parent1 = QStandardItem(file.name)
-            parent1.setEditable(False)
-            parent2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
-            parent2.setEditable(False)
-            parent3 = QStandardItem('')
-            parent3.setEditable(False)
-            parent4 = QStandardItem(os.path.splitext(file.name)[-1])
-            parent4.setEditable(False)
-            self.model.appendRow([parent1, parent2, parent3, parent4])
-            index = self.model.indexFromItem(parent1)
-            self.tree_view.expand(index)
-        self.timer.stop()
-        self.timer_check.stop()
+            child1 = QStandardItem(file.name)
+            child1.setEditable(False)
+            child1.setCheckable(True)
+            child1.setIcon(QIcon('gui/file.ico'))
+            self.items.append(child1)
+            child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
+            child2.setEditable(False)
+            child3 = QStandardItem('')
+            child3.setEditable(False)
+            child4 = QStandardItem(os.path.splitext(file.name)[-1])
+            child4.setEditable(False)
+            parent1.appendRow([child1, child2, child3, child4])
+        self.model.appendRow([parent1, parent2, parent3, parent4])
+        index = self.model.indexFromItem(parent1)
+        self.tree_view.expand(index)
 
     def cancel_search_handler(self):
         self.search_line.setText('')
@@ -367,13 +394,13 @@ class MainWindow(QMainWindow):
         self.timer_check.start()
 
     def get_checked(self):
-        checked_items = []
+        self.checked_items = []
         for i in self.items:
             if i.checkState() == Qt.Checked:
-                checked_items.append([str(i.text()), str(i.parent().text()), i])
-        self.download_button.setEnabled(True if len(checked_items) > 0 else False)
-        self.change_button.setEnabled(True if len(checked_items) == 1 else False)
-        return checked_items
+                self.checked_items.append([str(i.text()), str(i.parent().text()), i])
+        self.download_button.setEnabled(True if len(self.checked_items) > 0 else False)
+        self.change_button.setEnabled(True if len(self.checked_items) == 1 else False)
+        return self.checked_items
 
     def download(self):
         for i in self.get_checked():
