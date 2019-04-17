@@ -169,8 +169,10 @@ class PleaseWait(QMainWindow):
             self.dial_1.setValue(self.value)
             self.dial_2.setValue(99 - self.value)
         if self.threadpool.activeThreadCount() == 0:
-            self.window.close()
+            print('close')
             self.ret = self.worker.ret
+            self.window.removeEventFilter(self)
+            self.window.close()
 
     def eventFilter(self, obj, event):
         if obj is self.window and event.type() == QEvent.Close:
