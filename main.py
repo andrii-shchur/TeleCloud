@@ -7,6 +7,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 from telemethods import TeleCloudApp
 from teleclouderrors import FolderMissingError, FileDuplicateError
+from telecloudutils import resource_path
 import gui.logo
 import json
 from login import Worker
@@ -24,7 +25,7 @@ class EditFolder(QMainWindow):
     def __init__(self, ui_file, folder_name):
         super(EditFolder, self).__init__(parent=None)
         self.folder_name = folder_name
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
         self.old_name = folder_name
         loader = QUiLoader()
@@ -63,7 +64,7 @@ class EditFile(QMainWindow):
         super(EditFile, self).__init__(parent=None)
         self.file_name = file_name
         self.folder_name = folder_name
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
         self.old_name = file_name
         self.old_tags = file_tags
@@ -121,7 +122,7 @@ class UploadForm(QMainWindow):
         self.main = main
         self.file_path = file_path
         self.filename = filename
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
@@ -199,7 +200,7 @@ class UploadForm(QMainWindow):
 class FolderDialog(QMainWindow):
     def __init__(self, ui_file):
         super(FolderDialog, self).__init__(parent=None)
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
@@ -228,7 +229,7 @@ class FolderDialog(QMainWindow):
 class NewChannelForm(QMainWindow):
     def __init__(self, ui_file):
         super(NewChannelForm, self).__init__(parent=None)
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
@@ -250,7 +251,7 @@ class NewChannelForm(QMainWindow):
 class NewOrExistingChannelForm(QMainWindow):
     def __init__(self, ui_file):
         super(NewOrExistingChannelForm, self).__init__(parent=None)
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
@@ -275,7 +276,7 @@ class NewOrExistingChannelForm(QMainWindow):
 class MainWindow(QMainWindow):
     def __init__(self, ui_file):
         super(MainWindow, self).__init__(parent=None)
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
@@ -500,7 +501,7 @@ class MainWindow(QMainWindow):
 def client_exit():
     try:
         connector.client.stop()
-    except ConnectionError:
+    except (ConnectionError, AttributeError):
         pass
     sys.exit()
 
@@ -542,6 +543,6 @@ if __name__ == "__main__":
             new_channel()
         main_window()
     except Exception as e:
-        raise e
+        pass
     finally:
         client_exit()

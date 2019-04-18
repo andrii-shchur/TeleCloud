@@ -1,13 +1,11 @@
 import sys
-import os, threading
+
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 from PySide2.QtGui import *
 import gui.logo
-from threading import RLock
-
-_lock = RLock()
+from telecloudutils import resource_path
 
 
 def get_app_instance():
@@ -22,7 +20,7 @@ class BaseForm(QMainWindow):
         self.check = False
         super(BaseForm, self).__init__(parent=None)
         self.alert_message = alert_messasge
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
         self.user_input = ''
 
@@ -136,7 +134,7 @@ class Worker(QRunnable):
 class PleaseWait(QMainWindow):
     def __init__(self, ui_file, func):
         super(PleaseWait, self).__init__()
-        ui_file = QFile(ui_file)
+        ui_file = QFile(resource_path(ui_file))
         ui_file.open(QFile.ReadOnly)
 
         self.func = func

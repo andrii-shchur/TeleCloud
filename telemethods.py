@@ -1,14 +1,12 @@
-from pyrogram import Client, __version__
+from pyrogram import __version__
 from pyrogram.api.functions import channels
 import pyrogram
 
 from dbmethods import Session
 import platform
 from login import phone_number, telegram_code, two_factor_auth, please_wait
-from telecloudutils import split_into_parts, rebuild_from_parts, const_max_size
-from pyrogram.errors import FloodWait
-from teleclouderrors import UploadingError, FileDuplicateError, FileMissingError, FolderMissingError, \
-    FolderDuplicateError
+from telecloudutils import split_into_parts, const_max_size
+from teleclouderrors import FileDuplicateError, FolderMissingError
 from pyrewrite import TeleCloudClient
 import os, tempfile, time, shutil
 from tempfile import TemporaryDirectory
@@ -18,7 +16,7 @@ class TeleCloudApp:
     def __init__(self):
         api_id = 576793
         api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
-        session_file = 'TeleCloud'
+        session_file = 'TeleClouda'
         self.client = TeleCloudClient(
             session_file,
             device_model=platform.system(),
@@ -89,7 +87,7 @@ class TeleCloudApp:
                             self.db_session.merge_db(res)
                         return self.db_session.get_channel()
 
-        except Exception as e:
+        except Exception:
             return None
 
     def upload_db(self):
