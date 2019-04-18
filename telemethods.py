@@ -40,7 +40,6 @@ class TeleCloudApp:
         self.ret_channel = please_wait(self.init_login)
 
     def find_cloud_by_name(self):
-        total = self.client.get_dialogs(limit=0).total_count
         for x, i in enumerate(self.client.iter_dialogs()):
             while True:
                 try:
@@ -61,7 +60,6 @@ class TeleCloudApp:
                     continue
 
     def find_cloud_by_backup(self):
-        total = self.client.get_dialogs(limit=0).total_count
         for x, i in enumerate(self.client.iter_dialogs()):
             if i.chat.type == 'channel':
                 if self.load_db(i.chat.id):
@@ -105,7 +103,10 @@ class TeleCloudApp:
                                 break
                     while True:
                         try:
-                            self.client.send_document(self.db_session.get_channel()[0], db_path)
+                            self.client.send_document(
+                                self.db_session.get_channel()[0],
+                                db_path,
+                                disable_notification=True)
                             break
                         except PermissionError:
                             time.sleep(1)
@@ -162,6 +163,7 @@ class TeleCloudApp:
                 self.db_session.get_channel()[0],
                 file_name=os.path.basename(file_name),
                 documents=file_parts,
+                disable_notification=True,
                 progress=callback)
 
             for i in file:

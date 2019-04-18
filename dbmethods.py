@@ -9,7 +9,8 @@ _lock = threading.RLock()
 
 
 class BaseFile:
-    def __init__(self, file_ids: Union[Sequence[str], Set[str]], file_name: str, file_tags: Sequence[str], size: int, folder_name: str,
+    def __init__(self, file_ids: Union[Sequence[str], Set[str]], file_name: str, file_tags: Sequence[str], size: int,
+                 folder_name: str,
                  message_ids: Sequence[int], ):
         self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
         self.name = str(file_name)
@@ -94,7 +95,6 @@ class Session:
         f = int(f[0]) if f is not None else None
         if f != self.user_id:
             self.clear()
-
 
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
