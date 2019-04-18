@@ -117,9 +117,8 @@ class EditFile(QMainWindow):
 
 
 class UploadForm(QMainWindow):
-    def __init__(self, ui_file, file_path, filename, main):
+    def __init__(self, ui_file, file_path, filename):
         super(UploadForm, self).__init__(parent=None)
-        self.main = main
         self.file_path = file_path
         self.filename = filename
         ui_file = QFile(resource_path(ui_file))
@@ -130,9 +129,9 @@ class UploadForm(QMainWindow):
 
         ui_file.close()
         self.threadpool = QThreadPool()
+        self.window.installEventFilter(self)
 
-        self.filename_edit = self.window.findChild(QLineEdit, 'filename_edit')
-        self.filename_edit.textChanged.connect(self.check_if_exists)
+
         self.tags_line = self.window.findChild(QLineEdit, 'tagsEdit')
         self.upload_file = self.window.findChild(QCommandLinkButton, 'upload_file')
         self.upload_file.clicked.connect(self.handler)
@@ -140,9 +139,15 @@ class UploadForm(QMainWindow):
         self.alert_label.setStyleSheet('QLabel {color: #FF0000;}')
         self.folders_list = self.window.findChild(QComboBox, 'folders_list')
         self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
+        self.filename_edit = self.window.findChild(QLineEdit, 'filename_edit')
+        self.filename_edit.setText(filename)
+        self.check_if_exists(filename)
+        self.filename_edit.textChanged.connect(self.check_if_exists)
         self.progress_bar = self.window.findChild(QProgressBar, 'progressBar')
         self.worker = None
         self.ret = None
+        self.client = None
+        self.stop_needed = False
         self.window.show()
         self.timer = QTimer()
         self.timer.timeout.connect(self.check)
@@ -163,10 +168,9 @@ class UploadForm(QMainWindow):
             self.ret = self.worker.ret
             self.window.removeEventFilter(self)
             self.window.close()
-            self.main.upload_button.setEnabled(True)
             self.timer.stop()
         else:
-            self.main.upload_button.setEnabled(False)
+            pass
 
     def handler(self):
         tags = []
@@ -174,8 +178,9 @@ class UploadForm(QMainWindow):
             t = i.strip()
             if t:
                 tags.append(t)
+        print(42)
         try:
-            self.main.upload_button.setEnabled(False)
+            self.upload_file.setEnabled(False)
             self.alert_label.setText('Зачекайте, йде підготовка файлу...')
             self.worker = Worker(connector.upload_file, self.file_path,
                                  self.filename_edit.text(),
@@ -186,15 +191,25 @@ class UploadForm(QMainWindow):
             self.threadpool.start(self.worker)
 
         except FolderMissingError:
-            self.main.upload_button.setEnabled(False)
+            pass
         except FileDuplicateError:
             self.alert_label.setText('Файл з такою назвою вже існує')
-            self.main.upload_button.setEnabled(False)
 
     def upload_callback(self, client, current, total):
-        self.progress_bar.setValue((current / total) * 100)
+        print(current, total, sep='/')
+        if self.stop_needed:
+            self.window.close()
+            client.stop_transmission()
+
         if current == total:
             self.window.close()
+
+    def eventFilter(self, obj, event):
+        if obj is self.window and event.type() == QEvent.Close:
+            self.stop_needed = True
+            event.ignore()
+            return True
+        return super(UploadForm, self).eventFilter(obj, event)
 
 
 class FolderDialog(QMainWindow):
@@ -324,8 +339,7 @@ class MainWindow(QMainWindow):
         file_path = QFileDialog().getOpenFileName()
         filename = os.path.basename(file_path[0])
         if file_path[0] != '':
-            self.uploadform = UploadForm('gui/file_upload.ui', file_path[0], filename, self)
-            self.uploadform.filename_edit.setText(filename)
+            self.__a = UploadForm('gui/file_upload.ui', file_path[0], filename)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/folder_dialog.ui')
@@ -497,13 +511,13 @@ class MainWindow(QMainWindow):
 
     def change_button_handler(self):
         if not self.selected_item.parent().data():
-            self.a = EditFolder('gui/folder_change.ui', self.selected_item.data())
+            self.__a = EditFolder('gui/folder_change.ui', self.selected_item.data())
         else:
             file = connector.db_session.get_file_by_folder(
                 self.selected_item.data(),
                 self.selected_item.parent().data()
             )
-            self.a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
+            self.__a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
 
     def selection_changed(self, index):
         self.selected_item = index.sibling(index.row(), 0)

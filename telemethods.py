@@ -139,7 +139,7 @@ class TeleCloudApp:
             block=False)
 
     def download_callback(self, client, done, total):
-        pass
+        print(done, total, sep='/')
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):
@@ -159,28 +159,37 @@ class TeleCloudApp:
                 file_cp = shutil.copy(path, temp_dir.name)
                 file_parts = split_into_parts(file_cp)
 
-            file = self.client.send_named_document(
+            files = self.client.send_named_document(
                 self.db_session.get_channel()[0],
                 file_name=os.path.basename(file_name),
                 documents=file_parts,
                 disable_notification=True,
                 progress=callback)
+            if files is None:
+                return None
 
-            for i in file:
-                file_ids.append(i.document.file_id)
-                message_ids.append(i.message_id)
-
-            self.db_session.add_file(
-                file_ids=file_ids,
+            try:
+                self.db_session.add_file(
+                file_ids=[i.document.file_id for i in file_ids],
                 file_name=file_name,
                 file_tags=tags,
                 file_size=filesize,
                 folder_name=to_folder,
-                message_ids=message_ids)
-
-            self.upload_db()
+                message_ids=[i.message_id for i in files])
+                self.upload_db()
+            except FileDuplicateError:
+                while True:
+                    try:
+                        self.client.delete_messages(self.db_session.get_channel()[0], [m.message_id for m in files])
+                        break
+                    except pyrogram.errors.FloodWait as e:
+                        time.sleep(e.x)
+                        continue
         finally:
-            temp_dir.cleanup()
+            try:
+                temp_dir.cleanup()
+            except PermissionError:
+                pass
 
     def remove_file(self, file_name, folder_name):
         file = self.db_session.get_file_by_folder(file_name, folder_name)
@@ -242,3 +251,4 @@ class TeleCloudApp:
             return True
         except ConnectionError:
             return False
+

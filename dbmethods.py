@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import List, Sequence, Tuple, Set, Union
+from typing import List, Sequence, Tuple
 from teleclouderrors import FolderMissingError, FolderDuplicateError, FileDuplicateError, FileMissingError
 
 CONST_DATABASE_DELIMITER = '\0'

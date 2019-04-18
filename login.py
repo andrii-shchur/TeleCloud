@@ -6,6 +6,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 import gui.logo
 from telecloudutils import resource_path
+from teleclouderrors import FileDuplicateError
 
 
 def get_app_instance():
@@ -128,7 +129,10 @@ class Worker(QRunnable):
         self.func = func
 
     def run(self):
-        self.ret = self.func(*self.args, **self.kwargs)
+        try:
+            self.ret = self.func(*self.args, **self.kwargs)
+        except FileDuplicateError:
+            self.ret = None
 
 
 class PleaseWait(QMainWindow):
