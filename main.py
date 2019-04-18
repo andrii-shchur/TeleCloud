@@ -10,6 +10,7 @@ from teleclouderrors import FolderMissingError, FileDuplicateError
 import gui.logo
 import json
 from login import Worker
+from dbmethods import BaseFile, BaseFolder
 
 
 def get_app_instance():
@@ -73,7 +74,7 @@ class EditFile(QMainWindow):
         self.line_tags = self.window.findChild(QLineEdit, 'tags_edit')
 
         self.line_name.setText(file_name)
-        self.line_tags.setText(','.join(file_tags))
+        self.line_tags.setText(', '.join(file_tags))
         self.line_name.textChanged.connect(self.validate_name)
         self.line_tags.textChanged.connect(self.validate_tags)
         self.button_change = self.window.findChild(QPushButton, 'change_button')
@@ -140,6 +141,7 @@ class UploadForm(QMainWindow):
         self.folders_list.addItems([str(i) for i in connector.db_session.get_folders()])
         self.progress_bar = self.window.findChild(QProgressBar, 'progressBar')
         self.worker = None
+        self.ret = None
         self.window.show()
         self.timer = QTimer()
         self.timer.timeout.connect(self.check)
@@ -261,13 +263,13 @@ class NewOrExistingChannelForm(QMainWindow):
         create_channel_button.clicked.connect(self.create_handler)
         self.window.show()
 
-        def existing_handler(self):
-            self.window.close()
+    def existing_handler(self):
+        connector.check_channel(connector.db_session.get_channel())
+        self.window.close()
 
-        def create_handler(self):
-            self.window.hide()
-            connector.create_and_set_channel()
-            self.window.close()
+    def create_handler(self):
+        connector.create_and_set_channel()
+        self.window.close()
 
 
 class MainWindow(QMainWindow):
@@ -293,9 +295,8 @@ class MainWindow(QMainWindow):
         self.download_button.clicked.connect(self.download)
         self.change_button = self.window.findChild(QPushButton, 'change_button')
         self.change_button.clicked.connect(self.change_button_handler)
-        self.file_items = []
         self.folders_and_files_items = []
-
+        self.selected_item = None
         self.latest_folders = connector.db_session.get_folders()
         self.latest_files = [i.ret() for i in self.latest_folders]
         self.refresh(first=True)
@@ -309,11 +310,6 @@ class MainWindow(QMainWindow):
         self.download_timer.timeout.connect(self.get_checked)
         self.download_timer.setInterval(100)
         self.download_timer.start()
-
-        self.edit_timer = QTimer(self)
-        self.edit_timer.timeout.connect(self.get_all_checked)
-        self.edit_timer.setInterval(100)
-        self.edit_timer.start()
 
         self.window.show()
 
@@ -343,13 +339,14 @@ class MainWindow(QMainWindow):
                 ''.join(str(i) for i in latest_files) == ''.join(str(i) for i in self.latest_files)):
             return
         else:
-            self.file_items = []
             self.folders_and_files_items = []
             self.latest_folders = folders_list
             self.latest_files = latest_files
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
+
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
+        self.tree_view.clicked.connect(self.selection_changed)
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
         self.tree_view.setColumnWidth(0, 300)
@@ -370,7 +367,6 @@ class MainWindow(QMainWindow):
                 child1.setEditable(False)
                 child1.setCheckable(True)
                 child1.setIcon(QIcon('gui/file.ico'))
-                self.file_items.append(child1)
                 self.folders_and_files_items.append(child1)
                 child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
@@ -396,7 +392,6 @@ class MainWindow(QMainWindow):
         else:
             self.refresh_timer.stop()
             self.folders_and_files_items = []
-            self.file_items = []
 
         text = self.search_line.text()
 
@@ -407,8 +402,6 @@ class MainWindow(QMainWindow):
         self.tree_view.setModel(self.model)
         self.tree_view.setUniformRowHeights(True)
 
-        self.file_items = []
-        from dbmethods import BaseFile, BaseFolder
         folders_list = set([i.folder for i in found_files])
         folders = []
         for folder_name in folders_list:
@@ -434,7 +427,6 @@ class MainWindow(QMainWindow):
                 child1.setEditable(False)
                 child1.setCheckable(True)
                 child1.setIcon(QIcon('gui/file.ico'))
-                self.file_items.append(child1)
                 self.folders_and_files_items.append(child1)
                 child2 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
                 child2.setEditable(False)
@@ -484,29 +476,25 @@ class MainWindow(QMainWindow):
         self.download_button.setEnabled(True if len(checked_items) > 0 else False)
         return checked_items
 
-    def get_all_checked(self):
-        checked_items = []
-        for i in self.folders_and_files_items:
-            if i.checkState() == Qt.Checked:
-                if i.parent() is not None:
-                    checked_items.append([str(i.text()), str(i.parent().text()), i])
-                else:
-                    checked_items.append((str(i.text()), i))
-        self.change_button.setEnabled(True if len(checked_items) == 1 else False)
-        return checked_items
-
     def download(self):
         for i in self.get_checked():
-            i[2].setCheckState(Qt.Unchecked)
-            connector.download_file(i[0], i[1])
+            file_name, file_folder, item = i
+            item.setCheckState(Qt.Unchecked)
+            connector.download_file(file_name, file_folder)
 
     def change_button_handler(self):
-        item = self.get_all_checked()[0]
-        if len(item) == 2:
-            self.a = EditFolder('gui/folder_change.ui', item[0])
+        if not self.selected_item.parent().data():
+            self.a = EditFolder('gui/folder_change.ui', self.selected_item.data())
         else:
-            file = connector.db_session.get_file_by_folder(item[0], item[1])
+            file = connector.db_session.get_file_by_folder(
+                self.selected_item.data(),
+                self.selected_item.parent().data()
+            )
             self.a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
+
+    def selection_changed(self, index):
+        self.selected_item = index.sibling(index.row(), 0)
+        self.change_button.setEnabled(True)
 
 
 def client_exit():

@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, Set, Union
 from teleclouderrors import FolderMissingError, FolderDuplicateError, FileDuplicateError, FileMissingError
 
 CONST_DATABASE_DELIMITER = '\0'
@@ -9,7 +9,7 @@ _lock = threading.RLock()
 
 
 class BaseFile:
-    def __init__(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], size: int, folder_name: str,
+    def __init__(self, file_ids: Union[Sequence[str], Set[str]], file_name: str, file_tags: Sequence[str], size: int, folder_name: str,
                  message_ids: Sequence[int], ):
         self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
         self.name = str(file_name)
@@ -51,6 +51,7 @@ class BaseFolder:
 class Session:
     def __init__(self, session_name: str, user_id: int):
         self.session_name = session_name
+        self.user_id = user_id
         cursor = self._cursor()
         cursor.execute("SELECT NAME FROM sqlite_master WHERE TYPE='table'")
         check = cursor.fetchone()
@@ -91,9 +92,9 @@ class Session:
 
         f = self._cursor().execute('SELECT userId FROM Userdata').fetchone()
         f = int(f[0]) if f is not None else None
-        if f != user_id:
-            self.merge_db(':memory:')
-            self.__init__(session_name, user_id)
+        if f != self.user_id:
+            self.clear()
+
 
     def _cursor(self) -> sqlite3.Cursor:
         """Asserts that the connection is open and returns session cursor"""
@@ -102,6 +103,10 @@ class Session:
             self._conn.create_collation('ALLNOCASEIN',
                                         (lambda cell, string: 0 if string.lower() in cell.lower() else -1))
         return self._conn.cursor()
+
+    def clear(self):
+        self.merge_db(':memory:')
+        self.__init__(self.session_name, self.user_id)
 
     def set_channel(self, channel_id: int, access_hash: int):
         cursor = self._cursor()
@@ -228,6 +233,7 @@ class Session:
             raise FolderMissingError("Missing folder: '{}'".format(folder_name))
         if self.check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
+        file_tags = set(file_tags)
         with _lock:
             cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?, ?)',
                            (CONST_DATABASE_DELIMITER.join(file_ids),
@@ -280,7 +286,7 @@ class Session:
             cursor.execute(
                 'UPDATE Files SET fileName = (?), fileTags = (?) '
                 'WHERE fileName == (?) AND folderName == (?)',
-                (new_file_name, CONST_DATABASE_DELIMITER.join(new_file_tags), file_name, folder_name))
+                (new_file_name, CONST_DATABASE_DELIMITER.join(set(new_file_tags)), file_name, folder_name))
             self._conn.commit()
 
     def remove_file(self, file_name, folder_name):

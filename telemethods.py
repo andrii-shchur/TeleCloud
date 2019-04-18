@@ -36,7 +36,7 @@ class TeleCloudApp:
             sys.exit()
         self.db_session: Session = Session(session_file, self.client.get_me().id)
         self.chat_title = 'TelegramCloudApp'
-        self.chat_desc = 'TelegramCloudApp of {}! Don\'t change name or description!'.format(self.client.get_me().id)
+        self.chat_desc = 'TelegramCloudApp of {}! Don\'t change this description!'.format(self.client.get_me().id)
         self.chat_photo = 'gui/logo.png'
         self.local_dir = 'TeleCloudFolders/'
         self.ret_channel = please_wait(self.init_login)
@@ -233,6 +233,7 @@ class TeleCloudApp:
 
     def create_and_set_channel(self):
         channel = self.create_cloud_channel().chats[0]
+        self.db_session.clear()
         self.db_session.set_channel(int('-100' + str(channel.id)), channel.access_hash)
 
     def check_connection(self):
