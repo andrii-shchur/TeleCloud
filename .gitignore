@@ -5,3 +5,6 @@ __pycache__/
 *.tgdb
 *.session
 TeleCloudFolders/
+build/
+dist/
+*.spec
