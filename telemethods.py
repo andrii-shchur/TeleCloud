@@ -16,7 +16,7 @@ class TeleCloudApp:
     def __init__(self):
         api_id = 576793
         api_hash = '2458f89fda1ae88bed1ce71375a2a7cb'
-        session_file = 'TeleClouda'
+        session_file = 'TeleCloud'
         self.client = TeleCloudClient(
             session_file,
             device_model=platform.system(),
