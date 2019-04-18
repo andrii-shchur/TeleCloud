@@ -9,7 +9,7 @@ _lock = threading.RLock()
 
 
 class BaseFile:
-    def __init__(self, file_ids: Union[Sequence[str], Set[str]], file_name: str, file_tags: Sequence[str], size: int,
+    def __init__(self, file_ids: Sequence[str], file_name: str, file_tags: Sequence[str], size: int,
                  folder_name: str,
                  message_ids: Sequence[int], ):
         self.file_ids = file_ids.split(CONST_DATABASE_DELIMITER) if isinstance(file_ids, str) else file_ids
@@ -233,7 +233,7 @@ class Session:
             raise FolderMissingError("Missing folder: '{}'".format(folder_name))
         if self.check_file_exists(file_name, folder_name):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, folder_name))
-        file_tags = set(file_tags)
+        file_tags = list(set(file_tags))
         with _lock:
             cursor.execute('INSERT INTO Files VALUES(?, ?, ?, ?, ?, ?)',
                            (CONST_DATABASE_DELIMITER.join(file_ids),
@@ -286,7 +286,7 @@ class Session:
             cursor.execute(
                 'UPDATE Files SET fileName = (?), fileTags = (?) '
                 'WHERE fileName == (?) AND folderName == (?)',
-                (new_file_name, CONST_DATABASE_DELIMITER.join(set(new_file_tags)), file_name, folder_name))
+                (new_file_name, CONST_DATABASE_DELIMITER.join(list(set(new_file_tags))), file_name, folder_name))
             self._conn.commit()
 
     def remove_file(self, file_name, folder_name):
