@@ -130,7 +130,7 @@ class Session:
                 )
                 c = False
             else:
-                builder.append(' AND (fileName == (?) COLLATE ALLNOCASEIN OR fileTags == (?) COLLATE ALLNOCASEIN)\n')
+                builder.append(' OR (fileName == (?) COLLATE ALLNOCASEIN OR fileTags == (?) COLLATE ALLNOCASEIN)\n')
         res = ''.join(builder) + ')'
         return res
 

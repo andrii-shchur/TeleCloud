@@ -1,7 +1,5 @@
 import sys
 import os
-from typing import Sequence
-import re
 from PySide2.QtUiTools import QUiLoader
 from PySide2.QtXml import __loader__
 from PySide2.QtWidgets import *
@@ -14,59 +12,12 @@ import json
 from login import Worker
 
 
-def list_lstrip(s: str, args: Sequence[str]) -> str:
-    match = re.finditer(r'|'.join(re.escape(i) for i in args), s)
-    start = 0
-    for i in match:
-        if i.span()[0] == start:
-            start = i.span()[1]
-        else:
-            break
-    return s[start:]
-
-
-def list_rstrip(s: str, args: Sequence[str]) -> str:
-    match = re.finditer(r'|'.join(re.escape(i[::-1]) for i in args), s[::-1])
-    end = 0
-    for i in match:
-        if i.span()[0] == end:
-            end = i.span()[1]
-        else:
-            break
-    return s[:-end] if end != 0 else s
-
-
-def list_strip(s: str, args: Sequence[str]) -> str:
-    return list_rstrip(list_lstrip(s, args), args)
-
-
-const_spaces_list = (
-    '\n', ' ', '\xa0', '\u180e', '\u2000',
-    '\u2001', '\u2002', '\u2003',
-    '\u2004', '\u2005', '\u2006',
-    '\u2007', '\u2008', '\u2009',
-    '\u200a', '\u200b', '\u202f',
-    '\u205f', '\u2063', '\u3000',
-    'ㅤ', '\ufeff'
-)
-
-
 def get_app_instance():
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
     return app
 
-
-# def load_project_structure(startpath, tree):
-#     for element in os.listdir(startpath):
-#         path_info = startpath + "/" + element
-#         parent_itm = QTreeWidgetItem(tree, [os.path.basename(element)])
-#         if os.path.isdir(path_info):
-#             load_project_structure(path_info, parent_itm)
-#             parent_itm.setIcon(0, QIcon('assets/folder.ico'))
-#         else:
-#             parent_itm.setIcon(0, QIcon('assets/file.ico'))
 
 class EditFolder(QMainWindow):
     def __init__(self, ui_file, folder_name):
@@ -89,7 +40,8 @@ class EditFolder(QMainWindow):
         self.window.show()
 
     def validate(self):
-        if self.old_name == self.line.text().strip():
+        text = self.line.text().strip()
+        if self.old_name == text or text in [f.name for f in connector.db_session.get_folders()]:
             self.button_change.setEnabled(False)
         else:
             self.button_change.setEnabled(True)
@@ -132,7 +84,10 @@ class EditFile(QMainWindow):
         self.window.show()
 
     def validate_name(self):
-        if self.old_name == self.line_name.text().strip() or not self.line_name.text():
+        text = self.line_name.text().strip()
+        if (self.old_name == text or
+                not text or
+                text in [f.name for f in connector.db_session.get_folder(self.folder_name)]):
             self.button_change.setEnabled(False)
         else:
             self.button_change.setEnabled(True)
@@ -213,7 +168,7 @@ class UploadForm(QMainWindow):
     def handler(self):
         tags = []
         for i in self.tags_line.text().split(','):
-            t = list_strip(i, const_spaces_list)
+            t = i.strip()
             if t:
                 tags.append(t)
         try:
@@ -330,8 +285,6 @@ class MainWindow(QMainWindow):
         self.upload_button.clicked.connect(self.folders_exist)
 
         folder_create.clicked.connect(self.folder_handler)
-        search_button = self.window.findChild(QPushButton, 'search_button')
-        search_button.clicked.connect(self.search_handler)
         self.search_line = self.window.findChild(QLineEdit, 'search_line')
         self.search_line.textChanged.connect(self.search_handler)
         cancel_search_button = self.window.findChild(QToolButton, 'cancel_search_button')
@@ -371,11 +324,10 @@ class MainWindow(QMainWindow):
             self.upload_handler()
 
     def upload_handler(self):
-        self.dialog = QFileDialog()
-        self.file_path = self.dialog.getOpenFileName()
-        filename = os.path.basename(self.file_path[0])
-        if self.file_path[0] != '':
-            self.uploadform = UploadForm('gui/file_upload.ui', self.file_path[0], filename, self)
+        file_path = QFileDialog().getOpenFileName()
+        filename = os.path.basename(file_path[0])
+        if file_path[0] != '':
+            self.uploadform = UploadForm('gui/file_upload.ui', file_path[0], filename, self)
             self.uploadform.filename_edit.setText(filename)
 
     def folder_handler(self):
@@ -448,8 +400,7 @@ class MainWindow(QMainWindow):
 
         text = self.search_line.text()
 
-
-        found_files = connector.db_session.search_file(text.split())
+        found_files = connector.db_session.search_file([i.strip() for i in text.split(',') if i.strip()])
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Size', 'Total elements', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
@@ -499,14 +450,39 @@ class MainWindow(QMainWindow):
 
     def cancel_search_handler(self):
         self.search_line.setText('')
+        self.refresh(first=True)
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.refresh)
+        self.refresh_timer.setInterval(3000)
+        self.refresh_timer.start()
 
     def get_checked(self):
-        self.checked_items = []
-        for i in self.file_items:
-            if i.checkState() == Qt.Checked:
-                self.checked_items.append([str(i.text()), str(i.parent().text()), i])
-        self.download_button.setEnabled(True if len(self.checked_items) > 0 else False)
-        return self.checked_items
+        checked_items = []
+        for item in self.folders_and_files_items:
+            if item.checkState() == Qt.Checked:
+                if item.parent() is not None:
+
+                    checked_items.append([item.text(), item.parent().text(), item])
+                else:
+                    item.setCheckState(Qt.Unchecked)
+                    items_count = item.rowCount()
+                    c = 0
+                    for i in range(items_count):
+                        folder_item = item.child(i)
+                        if folder_item.checkState() == Qt.Checked:
+                            c += 1
+                    if c == items_count:
+                        for c in range(items_count):
+                            folder_item = item.child(c)
+                            folder_item.setCheckState(Qt.Unchecked)
+                    else:
+                        for i in range(items_count):
+                            folder_item = item.child(i)
+                            folder_item.setCheckState(Qt.Checked)
+                            checked_items.append([folder_item.text(), folder_item.parent().text(), folder_item])
+
+        self.download_button.setEnabled(True if len(checked_items) > 0 else False)
+        return checked_items
 
     def get_all_checked(self):
         checked_items = []

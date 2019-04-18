@@ -22,19 +22,16 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QLineEdit" name="search_line"/>
+       <widget class="QLineEdit" name="search_line">
+        <property name="placeholderText">
+         <string>Пошук файлів (через кому)</string>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QToolButton" name="cancel_search_button">
         <property name="text">
          <string>X</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="search_button">
-        <property name="text">
-         <string>Шукати</string>
         </property>
        </widget>
       </item>
@@ -89,7 +86,7 @@
      <x>0</x>
      <y>0</y>
      <width>700</width>
-     <height>26</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>
