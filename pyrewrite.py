@@ -625,7 +625,6 @@ class TeleCloudClient(PyrogramClient):
                 break
 
             temp_file_path = ""
-            final_file_path = ""
             files = []
 
             try:

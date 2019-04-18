@@ -31,7 +31,11 @@
       <item>
        <widget class="QToolButton" name="cancel_search_button">
         <property name="text">
-         <string>X</string>
+         <string/>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>cross.png</normaloff>cross.png</iconset>
         </property>
        </widget>
       </item>
@@ -42,7 +46,11 @@
       <item>
        <widget class="QPushButton" name="upload_button">
         <property name="text">
-         <string>Новий файл</string>
+         <string>Завантажити файл</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>upload.png</normaloff>upload.png</iconset>
         </property>
        </widget>
       </item>
@@ -50,6 +58,10 @@
        <widget class="QPushButton" name="folder_create">
         <property name="text">
          <string>Нова папка</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>new_folder.png</normaloff>new_folder.png</iconset>
         </property>
        </widget>
       </item>
@@ -61,6 +73,10 @@
         <property name="text">
          <string>Редагувати</string>
         </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>edit.png</normaloff>edit.png</iconset>
+        </property>
        </widget>
       </item>
       <item>
@@ -70,6 +86,10 @@
         </property>
         <property name="text">
          <string>Скачати файли</string>
+        </property>
+        <property name="icon">
+         <iconset>
+          <normaloff>download.png</normaloff>download.png</iconset>
         </property>
        </widget>
       </item>

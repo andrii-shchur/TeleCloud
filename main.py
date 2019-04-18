@@ -129,8 +129,6 @@ class UploadForm(QMainWindow):
 
         ui_file.close()
         self.threadpool = QThreadPool()
-        self.window.installEventFilter(self)
-
 
         self.tags_line = self.window.findChild(QLineEdit, 'tagsEdit')
         self.upload_file = self.window.findChild(QCommandLinkButton, 'upload_file')
@@ -155,8 +153,12 @@ class UploadForm(QMainWindow):
         self.timer.start()
 
     def check_if_exists(self, cur):
+        cur = cur.strip()
         if connector.db_session.check_file_exists(cur, self.folders_list.currentText()):
             self.alert_label.setText('Файл з такою назвою вже існує')
+            self.upload_file.setEnabled(False)
+        elif not cur:
+            self.alert_label.setText('')
             self.upload_file.setEnabled(False)
         else:
             self.alert_label.setText('')
@@ -189,6 +191,7 @@ class UploadForm(QMainWindow):
                                  self.upload_callback)
 
             self.threadpool.start(self.worker)
+            self.window.installEventFilter(self)
 
         except FolderMissingError:
             pass
