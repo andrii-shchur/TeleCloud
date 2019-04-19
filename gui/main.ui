@@ -59,10 +59,6 @@
         <property name="text">
          <string>Нова папка</string>
         </property>
-        <property name="icon">
-         <iconset resource="logo.qrc">
-          <normaloff>:/:/newPrefix/logo1.png/plus.png</normaloff>:/:/newPrefix/logo1.png/plus.png</iconset>
-        </property>
        </widget>
       </item>
       <item>
