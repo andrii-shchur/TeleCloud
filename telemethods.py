@@ -95,12 +95,12 @@ class TeleCloudApp:
                 db_path = os.path.join(path.name, 'DATABASE_BACKUP.tgdb')
                 self.db_session.export_db(db_path)
                 try:
-                    old_msg = None
+                    old_msgs = []
                     for x, m in enumerate(self.client.iter_history(self.db_session.get_channel()[0], limit=11)):
                         if m.document:
                             if m.document.file_name.endswith('.tgdb'):
-                                old_msg = m.message_id
-                                break
+                                old_msgs.append(m.message_id)
+
                     while True:
                         try:
                             self.client.send_document(
@@ -115,7 +115,7 @@ class TeleCloudApp:
                     continue
 
                 if old_msg is not None:
-                    m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=[old_msg])
+                    m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=old_msgs)
                     if m.messages:
                         m.messages[0].delete() if not m.messages[0].empty else None
                 break
