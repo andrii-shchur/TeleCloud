@@ -145,6 +145,7 @@ class PleaseWait(QMainWindow):
 
         loader = QUiLoader()
         self.window = loader.load(ui_file)
+        self.window.setWindowFlags(self.window.windowFlags() & ~Qt.WindowMinMaxButtonsHint & ~Qt.WindowCloseButtonHint)
         self.window.installEventFilter(self)
 
         self.ret = None

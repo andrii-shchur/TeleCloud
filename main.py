@@ -303,6 +303,21 @@ class NewOrExistingChannelForm(QMainWindow):
         self.window.close()
 
 
+class DownloadsWindow(QMainWindow):
+    def __init__(self, ui_file):
+        super(DownloadsWindow, self).__init__(parent=None)
+        ui_file = QFile(resource_path(ui_file))
+        ui_file.open(QFile.ReadOnly)
+
+        loader = QUiLoader()
+        self.window = loader.load(ui_file)
+        self.main_isclosed = False
+        ui_file.close()
+
+    @Slot(bool)
+    def slot_handler(self, boolean):
+        self.main_isclosed = boolean
+
 class MainWindow(QMainWindow):
     def __init__(self, ui_file):
         super(MainWindow, self).__init__(parent=None)
