@@ -305,6 +305,7 @@ class MainWindow(QMainWindow):
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         self.upload_button.clicked.connect(self.folders_exist)
 
+
         folder_create.clicked.connect(self.folder_handler)
         self.search_line = self.window.findChild(QLineEdit, 'search_line')
         self.search_line.textChanged.connect(self.search_handler)
@@ -314,6 +315,14 @@ class MainWindow(QMainWindow):
         self.download_button.clicked.connect(self.download)
         self.change_button = self.window.findChild(QPushButton, 'change_button')
         self.change_button.clicked.connect(self.change_button_handler)
+
+        self.upload_button.setIcon(QIcon('gui/upload.png'))
+        folder_create.setIcon(QIcon('gui/new_folder'))
+        self.change_button.setIcon(QIcon('gui/edit.png'))
+        cancel_search_button.setIcon(QIcon('gui/cross.png'))
+        self.download_button.setIcon(QIcon('gui/download.png'))
+
+
         self.folders_and_files_items = []
         self.selected_item = None
         self.latest_folders = connector.db_session.get_folders()
@@ -322,7 +331,7 @@ class MainWindow(QMainWindow):
 
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh)
-        self.refresh_timer.setInterval(3000)
+        self.refresh_timer.setInterval(1000)
         self.refresh_timer.start()
 
         self.download_timer = QTimer(self)
@@ -346,8 +355,6 @@ class MainWindow(QMainWindow):
 
     def folder_handler(self):
         self.folderdialog = FolderDialog('gui/create_folder.ui')
-        if connector.db_session.get_folders():
-            self.upload_button.clicked.connect(self.upload_handler)
 
     def refresh(self, first=False):
         folders_list = connector.db_session.get_folders()

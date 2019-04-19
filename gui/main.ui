@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>700</width>
-    <height>850</height>
+    <height>851</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -35,7 +35,7 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>cross.png</normaloff>cross.png</iconset>
+          <normaloff>:/:/newPrefix/logo1.png/cross.png</normaloff>:/:/newPrefix/logo1.png/cross.png</iconset>
         </property>
        </widget>
       </item>
@@ -50,7 +50,7 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>upload.png</normaloff>upload.png</iconset>
+          <normaloff>:/:/newPrefix/logo1.png/upload.png</normaloff>:/:/newPrefix/logo1.png/upload.png</iconset>
         </property>
        </widget>
       </item>
@@ -60,8 +60,8 @@
          <string>Нова папка</string>
         </property>
         <property name="icon">
-         <iconset>
-          <normaloff>new_folder.png</normaloff>new_folder.png</iconset>
+         <iconset resource="logo.qrc">
+          <normaloff>:/:/newPrefix/logo1.png/plus.png</normaloff>:/:/newPrefix/logo1.png/plus.png</iconset>
         </property>
        </widget>
       </item>
@@ -75,7 +75,7 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>edit.png</normaloff>edit.png</iconset>
+          <normaloff>:/:/newPrefix/logo1.png/edit.png</normaloff>:/:/newPrefix/logo1.png/edit.png</iconset>
         </property>
        </widget>
       </item>
@@ -89,7 +89,7 @@
         </property>
         <property name="icon">
          <iconset>
-          <normaloff>download.png</normaloff>download.png</iconset>
+          <normaloff>:/:/newPrefix/logo1.png/download.png</normaloff>:/:/newPrefix/logo1.png/download.png</iconset>
         </property>
        </widget>
       </item>
