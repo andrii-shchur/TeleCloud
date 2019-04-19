@@ -112,7 +112,7 @@ class TeleCloudApp:
                                 r = self.client.get_messages(chat_id=self.db_session.get_channel()[0],
                                                              message_ids=old_msgs)
                                 for m in r.messages:
-                                    print(m.delete())
+                                    m.delete()
                             break
 
                         except PermissionError:

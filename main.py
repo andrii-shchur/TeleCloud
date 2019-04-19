@@ -568,7 +568,7 @@ class MainWindow(QMainWindow):
     def eventFilter(self, obj, event):
         if obj is self.window and event.type() == QEvent.Close:
             event.accept()
-            Communicate().speak.connect(self.downloads_window.signal_catcher)
+            # Communicate().speak.connect(self.downloads_window.signal_catcher)
             return True
         elif obj is self.window and event.type() == QEvent.DragMove:
             event.setDropAction(Qt.CopyAction)
