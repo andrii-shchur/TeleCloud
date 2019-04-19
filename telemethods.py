@@ -114,7 +114,7 @@ class TeleCloudApp:
                     time.sleep(e.x)
                     continue
 
-                if old_msg is not None:
+                if old_msgs:
                     m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=old_msgs)
                     if m.messages:
                         m.messages[0].delete() if not m.messages[0].empty else None
