@@ -172,6 +172,7 @@ class TeleCloudClient(PyrogramClient):
         self.code_callback: callable = phone_code
         self.password_callback: callable = password
         self.separate_files = []
+        self.download_list_queue = []
 
     def stop(self):
         """Use this method to manually stop the Client.
@@ -517,8 +518,6 @@ class TeleCloudClient(PyrogramClient):
                             continue
 
 
-
-
         except TeleCloudClient.StopTransmission:
             raise
         except Exception as e:
@@ -648,7 +647,7 @@ class TeleCloudClient(PyrogramClient):
             block: bool = True,
             progress: callable = None,
             progress_args: tuple = (),
-            progress_total:int=None,
+            progress_total: int = None,
     ) -> Union[str, None]:
         """Use this method to download the media from a message.
 
@@ -760,7 +759,7 @@ class TeleCloudClient(PyrogramClient):
 
         done = Event()
         path = [None]
-
+        self.download_list_queue.append((medias, file_name, done, [progress, progress_total], progress_args, path))
         self.download_queue.put((medias, file_name, done, [progress, progress_total], progress_args, path))
 
         if block:
@@ -773,9 +772,9 @@ class TeleCloudClient(PyrogramClient):
         log.debug("{} started".format(name))
 
         while True:
-            media_queu_item = self.download_queue.get()
+            media_queue_item = self.download_queue.get()
 
-            if media_queu_item is None:
+            if media_queue_item is None:
                 break
 
             temp_file_path = ""
@@ -784,7 +783,7 @@ class TeleCloudClient(PyrogramClient):
 
             try:
 
-                medias, file_name, done, progress, progress_args, path = media_queu_item
+                medias, file_name, done, progress, progress_args, path = media_queue_item
                 progress, progress_total = progress
                 directory, file_name = os.path.split(file_name)
                 for media in medias:

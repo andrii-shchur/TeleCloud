@@ -131,7 +131,7 @@ class Worker(QRunnable):
     def run(self):
         try:
             self.ret = self.func(*self.args, **self.kwargs)
-        except Exception as e:
+        except (OSError, Exception) as e:
             self.ret = e
 
 

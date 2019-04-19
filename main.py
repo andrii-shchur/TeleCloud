@@ -318,6 +318,7 @@ class DownloadsWindow(QMainWindow):
     def slot_handler(self, boolean):
         self.main_isclosed = boolean
 
+
 class MainWindow(QMainWindow):
     def __init__(self, ui_file):
         super(MainWindow, self).__init__(parent=None)
@@ -325,9 +326,9 @@ class MainWindow(QMainWindow):
         ui_file.open(QFile.ReadOnly)
 
         loader = QUiLoader()
-        self.window = loader.load(ui_file)
+        self.window: QMainWindow = loader.load(ui_file)
         ui_file.close()
-
+        self.window.setAcceptDrops(True)
         self.upload_button = self.window.findChild(QPushButton, 'upload_button')
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         self.upload_button.clicked.connect(self.folders_exist)
@@ -452,6 +453,7 @@ class MainWindow(QMainWindow):
         else:
             self.refresh_timer.stop()
             self.folders_and_files_items = []
+            self.change_button.setEnabled(False)
 
         text = self.search_line.text()
 
@@ -465,7 +467,6 @@ class MainWindow(QMainWindow):
                     files_list.append(file)
             folders.append(BaseFolder(folder_name, files_list))
 
-
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Tags', 'Size', 'Total files', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
@@ -474,8 +475,6 @@ class MainWindow(QMainWindow):
         self.tree_view.setUniformRowHeights(True)
         self.tree_view.setColumnWidth(0, 300)
         self.tree_view.setColumnWidth(3, 60)
-
-
 
         for folder in folders:
             parent1 = QStandardItem(folder.name)
@@ -570,6 +569,25 @@ class MainWindow(QMainWindow):
         if obj is self.window and event.type() == QEvent.Close:
             event.accept()
             Communicate().speak.connect(self.downloads_window.signal_catcher)
+            return True
+        elif obj is self.window and event.type() == QEvent.DragMove:
+            event.setDropAction(Qt.CopyAction)
+            event.accept()
+            return True
+
+        elif obj is self.window and event.type() == QEvent.DragEnter:
+            event.accept()
+            return True
+
+        elif obj is self.window and event.type() == QEvent.Drop:
+            event.accept()
+            if not connector.db_session.get_folders():
+                self.folder_handler()
+            else:
+                for path in event.mimeData().urls():
+                    path = path.toLocalFile()
+                    filename = os.path.basename(path)
+                    UploadForm(resource_path('gui/upload_file_window.ui'), path, filename, self)
             return True
         return super(MainWindow, self).eventFilter(obj, event)
 
