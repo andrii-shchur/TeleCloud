@@ -21,13 +21,14 @@ import pyrogram
 import binascii
 import struct
 import hashlib
-import os, re, mimetypes, datetime
+import os, re, mimetypes, datetime, tempfile
 from threading import Event
-from telecloudutils import rebuild_from_parts
+from telecloudutils import rebuild_from_parts, const_max_size
+from pyrogram.crypto.aes import AES
 
 log = logging.getLogger(__name__)
 
-import shutil
+import shutil, math
 
 
 def btoi(b: bytes) -> int:
@@ -394,6 +395,152 @@ class TeleCloudClient(PyrogramClient):
 
         self.user_id = r.user.id
 
+    def save_file_callback_custom(self,
+                                  path: str,
+                                  file_id: int = None,
+                                  file_part: int = 0,
+                                  progress: callable = None,
+                                  progress_args: tuple = (),
+                                  progress_current: int = 0,
+                                  progress_total: int = None):
+        """Use this method to upload a file onto Telegram servers, without actually sending the message to anyone.
+
+        This is a utility method intended to be used **only** when working with Raw Functions (i.e: a Telegram API
+        method you wish to use which is not available yet in the Client class as an easy-to-use method), whenever an
+        InputFile type is required.
+
+        Args:
+            path (``str``):
+                The path of the file you want to upload that exists on your local machine.
+
+            file_id (``int``, *optional*):
+                In case a file part expired, pass the file_id and the file_part to retry uploading that specific chunk.
+
+            file_part (``int``, *optional*):
+                In case a file part expired, pass the file_id and the file_part to retry uploading that specific chunk.
+
+            progress (``callable``, *optional*):
+                Pass a callback function to view the upload progress.
+                The function must take *(client, current, total, \*args)* as positional arguments (look at the section
+                below for a detailed description).
+
+            progress_args (``tuple``, *optional*):
+                Extra custom arguments for the progress callback function. Useful, for example, if you want to pass
+                a chat_id and a message_id in order to edit a message with the updated progress.
+
+        Other Parameters:
+            client (:obj:`Client <pyrogram.Client>`):
+                The Client itself, useful when you want to call other API methods inside the callback function.
+
+            current (``int``):
+                The amount of bytes uploaded so far.
+
+            total (``int``):
+                The size of the file.
+
+            *args (``tuple``, *optional*):
+                Extra custom arguments as defined in the *progress_args* parameter.
+                You can either keep *\*args* or add every single extra argument in your function signature.
+
+        Returns:
+            On success, the uploaded file is returned in form of an InputFile object.
+
+        Raises:
+            :class:`RPCError <pyrogram.RPCError>` in case of a Telegram RPC error.
+        """
+        part_size = 512 * 1024
+        file_size = os.path.getsize(path)
+
+        if file_size == 0:
+            raise ValueError("File size equals to 0 B")
+
+        if file_size > 1500 * 1024 * 1024:
+            raise ValueError("Telegram doesn't support uploading files bigger than 1500 MiB")
+
+        file_total_parts = int(math.ceil(file_size / part_size))
+        is_big = True if file_size > 10 * 1024 * 1024 else False
+        is_missing_part = True if file_id is not None else False
+        file_id = file_id or self.rnd_id()
+        md5_sum = hashlib.md5() if not is_big and not is_missing_part else None
+
+        session = Session(self, self.dc_id, self.auth_key, is_media=True)
+        session.start()
+
+        try:
+            with open(path, "rb") as f:
+                f.seek(part_size * file_part)
+
+                while True:
+                    chunk = f.read(part_size)
+
+                    if not chunk:
+                        if not is_big:
+                            md5_sum = "".join([hex(i)[2:].zfill(2) for i in md5_sum.digest()])
+                        break
+                    while True:
+                        try:
+                            for _ in range(3):
+                                if is_big:
+                                    rpc = functions.upload.SaveBigFilePart(
+                                        file_id=file_id,
+                                        file_part=file_part,
+                                        file_total_parts=file_total_parts,
+                                        bytes=chunk
+                                    )
+                                else:
+                                    rpc = functions.upload.SaveFilePart(
+                                        file_id=file_id,
+                                        file_part=file_part,
+                                        bytes=chunk
+                                    )
+
+                                if session.send(rpc):
+                                    break
+                            else:
+                                raise AssertionError("Telegram didn't accept chunk #{} of {}".format(file_part, path))
+
+                            if is_missing_part:
+                                return
+
+                            if not is_big:
+                                md5_sum.update(chunk)
+
+                            file_part += 1
+
+                            if progress:
+                                progress(self, min(progress_current + file_part * part_size,
+                                                   file_size if not progress_total else progress_total),
+                                         file_size if not progress_total else progress_total, *progress_args)
+                            break
+                        except FloodWait as e:
+                            time.sleep(e.x)
+                            continue
+
+
+
+
+        except TeleCloudClient.StopTransmission:
+            raise
+        except Exception as e:
+            log.error(e, exc_info=True)
+        else:
+            if is_big:
+                return types.InputFileBig(
+                    id=file_id,
+                    parts=file_total_parts,
+                    name=os.path.basename(path),
+
+                )
+            else:
+                return types.InputFile(
+                    id=file_id,
+                    parts=file_total_parts,
+                    name=os.path.basename(path),
+                    md5_checksum=md5_sum
+                )
+        finally:
+            session.stop()
+
     def send_named_document(
             self,
             chat_id: Union[int, str],
@@ -411,16 +558,20 @@ class TeleCloudClient(PyrogramClient):
                 "pyrogram.ForceReply"
             ] = None,
             progress: callable = None,
-            progress_args: tuple = ()
+            progress_args: tuple = (),
+            progress_total=None
     ) -> Union[Sequence["pyrogram.Message"], None]:
-        file = None
         style = self.html if parse_mode.lower() == "html" else self.markdown
         medias = []
+        progress_current = 0
         for document in documents:
             try:
                 if os.path.exists(document):
                     thumb = None if thumb is None else self.save_file(thumb)
-                    file = self.save_file(document, progress=progress, progress_args=progress_args)
+                    file = self.save_file_callback_custom(document, progress=progress,
+                                                          progress_args=progress_args,
+                                                          progress_current=progress_current,
+                                                          progress_total=progress_total)
                     media = types.InputMediaUploadedDocument(
                         mime_type="application/zip",
                         file=file,
@@ -457,6 +608,8 @@ class TeleCloudClient(PyrogramClient):
                             )
                         )
                 medias.append(media)
+                progress_current += const_max_size
+
             except BaseClient.StopTransmission:
                 return None
         ret_updates = []
@@ -475,7 +628,7 @@ class TeleCloudClient(PyrogramClient):
                         )
                     )
                 except FilePartMissing as e:
-                    self.save_file(documents[x], file_id=file.id, file_part=e.x)
+                    self.save_file(documents[x], file_id=media.id, file_part=e.x)
                 else:
                     for i in r.updates:
                         if isinstance(i, (types.UpdateNewMessage, types.UpdateNewChannelMessage)):
@@ -700,3 +853,207 @@ class TeleCloudClient(PyrogramClient):
                 done.set()
 
             log.debug("{} stopped".format(name))
+
+    def get_file(self,
+                 dc_id: int,
+                 id: int = None,
+                 access_hash: int = None,
+                 volume_id: int = None,
+                 local_id: int = None,
+                 secret: int = None,
+                 size: int = None,
+                 progress: callable = None,
+                 progress_args: tuple = ()) -> str:
+        with self.media_sessions_lock:
+            session = self.media_sessions.get(dc_id, None)
+
+            if session is None:
+                if dc_id != self.dc_id:
+                    exported_auth = self.send(
+                        functions.auth.ExportAuthorization(
+                            dc_id=dc_id
+                        )
+                    )
+
+                    session = Session(
+                        self,
+                        dc_id,
+                        Auth(dc_id, self.test_mode, self.ipv6, self._proxy).create(),
+                        is_media=True
+                    )
+
+                    session.start()
+
+                    self.media_sessions[dc_id] = session
+
+                    session.send(
+                        functions.auth.ImportAuthorization(
+                            id=exported_auth.id,
+                            bytes=exported_auth.bytes
+                        )
+                    )
+                else:
+                    session = Session(
+                        self,
+                        dc_id,
+                        self.auth_key,
+                        is_media=True
+                    )
+
+                    session.start()
+
+                    self.media_sessions[dc_id] = session
+
+        if volume_id:  # Photos are accessed by volume_id, local_id, secret
+            location = types.InputFileLocation(
+                volume_id=volume_id,
+                local_id=local_id,
+                secret=secret,
+                file_reference=b""
+            )
+        else:  # Any other file can be more easily accessed by id and access_hash
+            location = types.InputDocumentFileLocation(
+                id=id,
+                access_hash=access_hash,
+                file_reference=b""
+            )
+
+        limit = 1024 * 1024
+        offset = 0
+        file_name = ""
+
+        try:
+            r = session.send(
+                functions.upload.GetFile(
+                    location=location,
+                    offset=offset,
+                    limit=limit
+                )
+            )
+
+            if isinstance(r, types.upload.File):
+                with tempfile.NamedTemporaryFile("wb", delete=False) as f:
+                    file_name = f.name
+
+                    while True:
+                        try:
+                            chunk = r.bytes
+
+                            if not chunk:
+                                break
+
+                            f.write(chunk)
+
+                            offset += limit
+
+                            if progress:
+                                progress(self, min(offset, size) if size != 0 else offset, size, *progress_args)
+
+                            r = session.send(
+                                functions.upload.GetFile(
+                                    location=location,
+                                    offset=offset,
+                                    limit=limit
+                                )
+                            )
+
+                        except FloodWait as e:
+                            time.sleep(e.x)
+                            continue
+
+
+            elif isinstance(r, types.upload.FileCdnRedirect):
+                with self.media_sessions_lock:
+                    cdn_session = self.media_sessions.get(r.dc_id, None)
+
+                    if cdn_session is None:
+                        cdn_session = Session(
+                            self,
+                            r.dc_id,
+                            Auth(r.dc_id, self.test_mode, self.ipv6, self._proxy).create(),
+                            is_media=True,
+                            is_cdn=True
+                        )
+
+                        cdn_session.start()
+
+                        self.media_sessions[r.dc_id] = cdn_session
+
+                try:
+                    with tempfile.NamedTemporaryFile("wb", delete=False) as f:
+                        file_name = f.name
+
+                        while True:
+                            try:
+                                r2 = cdn_session.send(
+                                    functions.upload.GetCdnFile(
+                                        file_token=r.file_token,
+                                        offset=offset,
+                                        limit=limit
+                                    )
+                                )
+
+                                if isinstance(r2, types.upload.CdnFileReuploadNeeded):
+                                    try:
+                                        session.send(
+                                            functions.upload.ReuploadCdnFile(
+                                                file_token=r.file_token,
+                                                request_token=r2.request_token
+                                            )
+                                        )
+                                    except VolumeLocNotFound:
+                                        break
+                                    else:
+                                        continue
+
+                                chunk = r2.bytes
+
+                                # https://core.telegram.org/cdn#decrypting-files
+                                decrypted_chunk = AES.ctr256_decrypt(
+                                    chunk,
+                                    r.encryption_key,
+                                    bytearray(
+                                        r.encryption_iv[:-4]
+                                        + (offset // 16).to_bytes(4, "big")
+                                    )
+                                )
+
+                                hashes = session.send(
+                                    functions.upload.GetCdnFileHashes(
+                                        file_token=r.file_token,
+                                        offset=offset
+                                    )
+                                )
+
+                                # https://core.telegram.org/cdn#verifying-files
+                                for i, h in enumerate(hashes):
+                                    cdn_chunk = decrypted_chunk[h.limit * i: h.limit * (i + 1)]
+                                    assert h.hash == sha256(cdn_chunk).digest(), "Invalid CDN hash part {}".format(i)
+
+                                f.write(decrypted_chunk)
+
+                                offset += limit
+
+                                if progress:
+                                    progress(self, min(offset, size) if size != 0 else offset, size, *progress_args)
+
+                                if len(chunk) < limit:
+                                    break
+                            except FloodWait as e:
+                                time.sleep(e.x)
+                                continue
+
+                except Exception as e:
+                    raise e
+        except Exception as e:
+            if not isinstance(e, TeleCloudClient.StopTransmission):
+                log.error(e, exc_info=True)
+
+            try:
+                os.remove(file_name)
+            except OSError:
+                pass
+
+            return ""
+        else:
+            return file_name

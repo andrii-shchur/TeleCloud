@@ -131,8 +131,8 @@ class Worker(QRunnable):
     def run(self):
         try:
             self.ret = self.func(*self.args, **self.kwargs)
-        except FileDuplicateError:
-            self.ret = None
+        except Exception as e:
+            self.ret = e
 
 
 class PleaseWait(QMainWindow):

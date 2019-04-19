@@ -147,13 +147,12 @@ class TeleCloudApp:
         if self.db_session.check_file_exists(file_name, to_folder):
             raise FileDuplicateError("File '{}' already exists in folder: '{}'".format(file_name, to_folder))
         file_ids = []
-        message_ids = []
         filesize = os.path.getsize(path)
         temp_dir = tempfile.TemporaryDirectory()
         try:
             if filesize <= const_max_size:
 
-                file_cp = shutil.copy(path, temp_dir.name)
+                file_cp = path
                 file_parts = [file_cp]
             else:
                 file_cp = shutil.copy(path, temp_dir.name)
@@ -164,18 +163,19 @@ class TeleCloudApp:
                 file_name=os.path.basename(file_name),
                 documents=file_parts,
                 disable_notification=True,
-                progress=callback)
+                progress=callback,
+                progress_total=filesize)
             if files is None:
                 return None
 
             try:
                 self.db_session.add_file(
-                file_ids=[i.document.file_id for i in file_ids],
-                file_name=file_name,
-                file_tags=tags,
-                file_size=filesize,
-                folder_name=to_folder,
-                message_ids=[i.message_id for i in files])
+                    file_ids=[i.document.file_id for i in file_ids],
+                    file_name=file_name,
+                    file_tags=tags,
+                    file_size=filesize,
+                    folder_name=to_folder,
+                    message_ids=[i.message_id for i in files])
                 self.upload_db()
             except FileDuplicateError:
                 while True:
@@ -251,4 +251,3 @@ class TeleCloudApp:
             return True
         except ConnectionError:
             return False
-

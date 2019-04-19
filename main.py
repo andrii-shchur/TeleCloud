@@ -142,6 +142,8 @@ class UploadForm(QMainWindow):
         self.check_if_exists(filename)
         self.filename_edit.textChanged.connect(self.check_if_exists)
         self.progress_bar = self.window.findChild(QProgressBar, 'progressBar')
+        self.current = 0
+        self.total = 1
         self.worker = None
         self.ret = None
         self.client = None
@@ -158,7 +160,7 @@ class UploadForm(QMainWindow):
             self.alert_label.setText('Файл з такою назвою вже існує')
             self.upload_file.setEnabled(False)
         elif not cur:
-            self.alert_label.setText('')
+            self.alert_label.setText('Назва файлу не може бути порожньою!')
             self.upload_file.setEnabled(False)
         else:
             self.alert_label.setText('')
@@ -166,13 +168,18 @@ class UploadForm(QMainWindow):
 
     def check(self):
         thr = self.threadpool.activeThreadCount()
+        print(thr, self.worker)
         if self.worker is not None and thr == 0:
             self.ret = self.worker.ret
             self.window.removeEventFilter(self)
+            if isinstance(self.ret, (Exception, OSError)):
+                self.alert_label.setText(str(self.ret))
+                self.timer.stop()
+                return
             self.window.close()
             self.timer.stop()
         else:
-            pass
+            self.progress_bar.setValue(int((self.current / self.total) * 100))
 
     def handler(self):
         tags = []
@@ -182,9 +189,12 @@ class UploadForm(QMainWindow):
                 tags.append(t)
         try:
             self.upload_file.setEnabled(False)
+            self.filename_edit.setEnabled(False)
+            self.folders_list.setEnabled(False)
+            self.tags_line.setEnabled(False)
             self.alert_label.setText('Зачекайте, йде підготовка файлу...')
             self.worker = Worker(connector.upload_file, self.file_path,
-                                 self.filename_edit.text(),
+                                 self.filename_edit.text().strip(),
                                  tags,
                                  self.folders_list.currentText(),
                                  self.upload_callback)
@@ -199,6 +209,8 @@ class UploadForm(QMainWindow):
 
     def upload_callback(self, client, current, total):
         print(current, total, sep='/')
+        self.total = total
+        self.current = current
         if self.stop_needed:
             self.window.close()
             client.stop_transmission()
@@ -274,7 +286,7 @@ class NewOrExistingChannelForm(QMainWindow):
         loader = QUiLoader()
         self.window = loader.load(ui_file)
         ui_file.close()
-
+        self.check = False
         existing_channel_button = self.window.findChild(QCommandLinkButton, 'existing_channel')
         existing_channel_button.clicked.connect(self.existing_handler)
         create_channel_button = self.window.findChild(QCommandLinkButton, 'create_channel')
@@ -282,10 +294,12 @@ class NewOrExistingChannelForm(QMainWindow):
         self.window.show()
 
     def existing_handler(self):
+        self.check = True
         connector.check_channel(connector.db_session.get_channel())
         self.window.close()
 
     def create_handler(self):
+        self.check = True
         connector.create_and_set_channel()
         self.window.close()
 
@@ -554,6 +568,8 @@ def existing_channel():
     app = get_app_instance()
     existingchannelform = NewOrExistingChannelForm(resource_path('gui/choose_existing_channel.ui'))
     app.exec_()
+    if not existingchannelform.check:
+        client_exit()
 
 
 def main_window():
@@ -562,7 +578,14 @@ def main_window():
     app.exec_()
 
 
+def clean_temp():
+    import tempfile, shutil
+    for path in os.listdir(tempfile.gettempdir()):
+        shutil.rmtree(os.path.join(tempfile.gettempdir(), path), ignore_errors=True)
+
+
 if __name__ == "__main__":
+    clean_temp()
     connector = None
     try:
         try:
@@ -579,6 +602,7 @@ if __name__ == "__main__":
             new_channel()
         main_window()
     except Exception as e:
+        print(e.__class__, str(e))
         pass
     finally:
         client_exit()

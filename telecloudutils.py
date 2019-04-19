@@ -1,4 +1,5 @@
 import os, sys
+
 const_chunk_size = 104857600
 const_max_size = 1520435200
 
@@ -50,6 +51,7 @@ def rebuild_from_parts(output_file, parts_list):
                 f.write(buf)
 
     return output_file
+
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
