@@ -180,7 +180,6 @@ class UploadForm(QMainWindow):
             t = i.strip()
             if t:
                 tags.append(t)
-        print(42)
         try:
             self.upload_file.setEnabled(False)
             self.alert_label.setText('Зачекайте, йде підготовка файлу...')
@@ -347,11 +346,12 @@ class MainWindow(QMainWindow):
 
     def upload_handler(self):
         file_path = QFileDialog().getOpenFileNames(self)
-        print(file_path)
 
-        for i in file_path[0]:
-            filename = os.path.basename(i)
-            UploadForm(resource_path('gui/upload_file_window.ui'), i, filename, self)
+        for path in file_path[0]:
+            if path.endswith('.tgdb'):
+                continue
+            filename = os.path.basename(path)
+            UploadForm(resource_path('gui/upload_file_window.ui'), path, filename, self)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog(resource_path('gui/create_folder.ui'))

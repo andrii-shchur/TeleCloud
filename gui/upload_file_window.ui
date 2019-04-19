@@ -34,6 +34,13 @@
      </widget>
     </item>
     <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>Оберіть папку:</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QComboBox" name="folders_list"/>
     </item>
     <item>
@@ -107,7 +114,7 @@
      <x>0</x>
      <y>0</y>
      <width>400</width>
-     <height>26</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>
