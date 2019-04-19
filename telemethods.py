@@ -4,7 +4,7 @@ import pyrogram
 
 from dbmethods import Session
 import platform
-from login import phone_number, telegram_code, two_factor_auth, please_wait
+from separate_gui import phone_number, telegram_code, two_factor_auth, please_wait
 from telecloudutils import split_into_parts, const_max_size
 from teleclouderrors import FileDuplicateError, FolderMissingError
 from pyrewrite import TeleCloudClient

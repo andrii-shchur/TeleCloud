@@ -185,7 +185,7 @@ class PleaseWait(QMainWindow):
 
 def phone_number(alert_message='', predefined_number=''):
     app = get_app_instance()
-    phoneval = PhoneForm('gui/login.ui', alert_message, predefined_number)
+    phoneval = PhoneForm('gui/phone_login_window.ui', alert_message, predefined_number)
     app.exec_()
     if not phoneval.check:
         return False
@@ -194,7 +194,7 @@ def phone_number(alert_message='', predefined_number=''):
 
 def telegram_code(phone_number, alert_message=''):
     app = get_app_instance()
-    codeval = CodeForm('gui/confirm.ui', alert_message)
+    codeval = CodeForm('gui/code_login_window.ui', alert_message)
     app.exec_()
     if not codeval.check:
         return False
@@ -203,7 +203,7 @@ def telegram_code(phone_number, alert_message=''):
 
 def two_factor_auth(password_hint, alert_message=''):
     app = get_app_instance()
-    passval = PasswordForm('gui/2fa.ui', alert_message)
+    passval = PasswordForm('gui/2fa_login_window.ui', alert_message)
     app.exec_()
     if not passval.check:
         return False

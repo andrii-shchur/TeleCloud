@@ -10,7 +10,7 @@ from teleclouderrors import FolderMissingError, FileDuplicateError
 from telecloudutils import resource_path
 import gui.logo
 import json
-from login import Worker
+from separate_gui import Worker
 from dbmethods import BaseFile, BaseFolder
 
 
@@ -342,10 +342,10 @@ class MainWindow(QMainWindow):
         file_path = QFileDialog().getOpenFileName()
         filename = os.path.basename(file_path[0])
         if file_path[0] != '':
-            self.__a = UploadForm('gui/file_upload.ui', file_path[0], filename)
+            self.__a = UploadForm('gui/upload_file_window.ui', file_path[0], filename)
 
     def folder_handler(self):
-        self.folderdialog = FolderDialog('gui/folder_dialog.ui')
+        self.folderdialog = FolderDialog('gui/create_folder.ui')
         if connector.db_session.get_folders():
             self.upload_button.clicked.connect(self.upload_handler)
 
@@ -514,13 +514,13 @@ class MainWindow(QMainWindow):
 
     def change_button_handler(self):
         if not self.selected_item.parent().data():
-            self.__a = EditFolder('gui/folder_change.ui', self.selected_item.data())
+            self.__a = EditFolder('gui/edit_folder.ui', self.selected_item.data())
         else:
             file = connector.db_session.get_file_by_folder(
                 self.selected_item.data(),
                 self.selected_item.parent().data()
             )
-            self.__a = EditFile('gui/file_change.ui', file.name, file.tags, file.folder)
+            self.__a = EditFile('gui/edit_file.ui', file.name, file.tags, file.folder)
 
     def selection_changed(self, index):
         self.selected_item = index.sibling(index.row(), 0)
@@ -537,7 +537,7 @@ def client_exit():
 
 def new_channel():
     app = get_app_instance()
-    newchannelform = NewChannelForm('gui/create_channel.ui')
+    newchannelform = NewChannelForm('gui/create_new_channel.ui')
     app.exec_()
     if not newchannelform.check:
         client_exit()
@@ -545,7 +545,7 @@ def new_channel():
 
 def existing_channel():
     app = get_app_instance()
-    existingchannelform = NewOrExistingChannelForm('gui/existing_channel.ui')
+    existingchannelform = NewOrExistingChannelForm('gui/choose_existing_channel.ui')
     app.exec_()
 
 
