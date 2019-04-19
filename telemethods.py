@@ -107,17 +107,21 @@ class TeleCloudApp:
                                 self.db_session.get_channel()[0],
                                 db_path,
                                 disable_notification=True)
+
+                            if old_msgs:
+                                r = self.client.get_messages(chat_id=self.db_session.get_channel()[0],
+                                                             message_ids=old_msgs)
+                                for m in r.messages:
+                                    print(m.delete())
                             break
+
                         except PermissionError:
                             time.sleep(1)
                 except pyrogram.errors.FloodWait as e:
+                    print(e)
                     time.sleep(e.x)
                     continue
 
-                if old_msgs:
-                    m = self.client.get_messages(chat_id=self.db_session.get_channel()[0], message_ids=old_msgs)
-                    if m.messages:
-                        m.messages[0].delete() if not m.messages[0].empty else None
                 break
             finally:
                 try:
@@ -126,6 +130,7 @@ class TeleCloudApp:
                     pass
 
     def download_file(self, file_name, file_folder):
+
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
         msg_objs = self.client.get_messages(
@@ -137,7 +142,7 @@ class TeleCloudApp:
             file_name=os.path.join(self.local_dir, file_folder, file_name),
             progress=self.download_callback,
             block=False,
-        progress_total=files.size)
+            progress_total=files.size)
 
     def download_callback(self, client, done, total):
         print(done, total, sep='/')
