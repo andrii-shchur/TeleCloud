@@ -576,6 +576,7 @@ class MainWindow(QMainWindow):
             return True
 
         elif obj is self.window and event.type() == QEvent.DragEnter:
+            event.setDropAction(Qt.CopyAction)
             event.accept()
             return True
 
