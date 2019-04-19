@@ -305,7 +305,6 @@ class MainWindow(QMainWindow):
         folder_create = self.window.findChild(QPushButton, 'folder_create')
         self.upload_button.clicked.connect(self.folders_exist)
 
-
         folder_create.clicked.connect(self.folder_handler)
         self.search_line = self.window.findChild(QLineEdit, 'search_line')
         self.search_line.textChanged.connect(self.search_handler)
@@ -316,12 +315,11 @@ class MainWindow(QMainWindow):
         self.change_button = self.window.findChild(QPushButton, 'change_button')
         self.change_button.clicked.connect(self.change_button_handler)
 
-        self.upload_button.setIcon(QIcon('gui/upload.png'))
-        folder_create.setIcon(QIcon('gui/new_folder'))
-        self.change_button.setIcon(QIcon('gui/edit.png'))
-        cancel_search_button.setIcon(QIcon('gui/cross.png'))
-        self.download_button.setIcon(QIcon('gui/download.png'))
-
+        self.upload_button.setIcon(QIcon(resource_path('gui/upload.png')))
+        folder_create.setIcon(QIcon(resource_path('gui/new_folder')))
+        self.change_button.setIcon(QIcon(resource_path('gui/edit.png')))
+        cancel_search_button.setIcon(QIcon(resource_path('gui/cross.png')))
+        self.download_button.setIcon(QIcon(resource_path('gui/download.png')))
 
         self.folders_and_files_items = []
         self.selected_item = None
@@ -351,10 +349,10 @@ class MainWindow(QMainWindow):
         file_path = QFileDialog().getOpenFileName()
         filename = os.path.basename(file_path[0])
         if file_path[0] != '':
-            self.__a = UploadForm('gui/upload_file_window.ui', file_path[0], filename)
+            self.__a = UploadForm(resource_path('gui/upload_file_window.ui'), file_path[0], filename)
 
     def folder_handler(self):
-        self.folderdialog = FolderDialog('gui/create_folder.ui')
+        self.folderdialog = FolderDialog(resource_path('gui/create_folder.ui'))
 
     def refresh(self, first=False):
         folders_list = connector.db_session.get_folders()
@@ -381,7 +379,7 @@ class MainWindow(QMainWindow):
             self.folders_and_files_items.append(parent1)
             parent1.setEditable(False)
             parent1.setCheckable(True)
-            parent1.setIcon(QIcon('gui/folder.ico'))
+            parent1.setIcon(QIcon(resource_path('gui/folder.ico')))
             parent2 = QStandardItem('')
             parent2.setEditable(False)
             parent3 = QStandardItem(str(round(folder.size / 1024, 3)) + ' KB')
@@ -394,7 +392,7 @@ class MainWindow(QMainWindow):
                 child1 = QStandardItem(file.name)
                 child1.setEditable(False)
                 child1.setCheckable(True)
-                child1.setIcon(QIcon('gui/file.ico'))
+                child1.setIcon(QIcon(resource_path('gui/file.ico')))
                 child2 = QStandardItem(', '.join(file.tags))
                 child2.setEditable(False)
                 child3 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
@@ -449,7 +447,7 @@ class MainWindow(QMainWindow):
             self.folders_and_files_items.append(parent1)
             parent1.setEditable(False)
             parent1.setCheckable(True)
-            parent1.setIcon(QIcon('gui/folder.ico'))
+            parent1.setIcon(QIcon(resource_path('gui/folder.ico')))
             parent2 = QStandardItem('')
             parent3 = QStandardItem(str(round(folder.size / 1024, 3)) + ' KB')
             parent3.setEditable(False)
@@ -461,7 +459,7 @@ class MainWindow(QMainWindow):
                 child1 = QStandardItem(file.name)
                 child1.setEditable(False)
                 child1.setCheckable(True)
-                child1.setIcon(QIcon('gui/file.ico'))
+                child1.setIcon(QIcon(resource_path('gui/file.ico')))
                 child2 = QStandardItem(', '.join(file.tags))
                 child2.setEditable(False)
                 child3 = QStandardItem(str(round(file.size / 1024, 3)) + ' KB')
@@ -521,13 +519,13 @@ class MainWindow(QMainWindow):
 
     def change_button_handler(self):
         if not self.selected_item.parent().data():
-            self.__a = EditFolder('gui/edit_folder.ui', self.selected_item.data())
+            self.__a = EditFolder(resource_path('gui/edit_folder.ui'), self.selected_item.data())
         else:
             file = connector.db_session.get_file_by_folder(
                 self.selected_item.data(),
                 self.selected_item.parent().data()
             )
-            self.__a = EditFile('gui/edit_file.ui', file.name, file.tags, file.folder)
+            self.__a = EditFile(resource_path('gui/edit_file.ui'), file.name, file.tags, file.folder)
 
     def selection_changed(self, index):
         self.selected_item = index.sibling(index.row(), 0)
@@ -544,7 +542,7 @@ def client_exit():
 
 def new_channel():
     app = get_app_instance()
-    newchannelform = NewChannelForm('gui/create_new_channel.ui')
+    newchannelform = NewChannelForm(resource_path('gui/create_new_channel.ui'))
     app.exec_()
     if not newchannelform.check:
         client_exit()
@@ -552,13 +550,13 @@ def new_channel():
 
 def existing_channel():
     app = get_app_instance()
-    existingchannelform = NewOrExistingChannelForm('gui/choose_existing_channel.ui')
+    existingchannelform = NewOrExistingChannelForm(resource_path('gui/choose_existing_channel.ui'))
     app.exec_()
 
 
 def main_window():
     app = get_app_instance()
-    mainwindow = MainWindow('gui/main.ui')
+    mainwindow = MainWindow(resource_path('gui/main.ui'))
     app.exec_()
 
 
