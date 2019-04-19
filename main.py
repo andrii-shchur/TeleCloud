@@ -348,6 +348,7 @@ class MainWindow(QMainWindow):
         self.download_timer.timeout.connect(self.get_checked)
         self.download_timer.setInterval(100)
         self.download_timer.start()
+        self.window.installEventFilter(self)
 
         self.window.show()
 
@@ -440,6 +441,16 @@ class MainWindow(QMainWindow):
         text = self.search_line.text()
 
         found_files = connector.db_session.search_file([i.strip() for i in text.split(',') if i.strip()])
+        folders_list = set([i.folder for i in found_files])
+        folders = []
+        for folder_name in folders_list:
+            files_list = []
+            for file in found_files:
+                if file.folder == folder_name:
+                    files_list.append(file)
+            folders.append(BaseFolder(folder_name, files_list))
+
+
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Name', 'Tags', 'Size', 'Total files', 'Type'])
         self.tree_view = self.window.findChild(QTreeView, 'treeView')
@@ -449,14 +460,8 @@ class MainWindow(QMainWindow):
         self.tree_view.setColumnWidth(0, 300)
         self.tree_view.setColumnWidth(3, 60)
 
-        folders_list = set([i.folder for i in found_files])
-        folders = []
-        for folder_name in folders_list:
-            files_list = []
-            for file in found_files:
-                if file.folder == folder_name:
-                    files_list.append(file)
-            folders.append(BaseFolder(folder_name, files_list))
+
+
         for folder in folders:
             parent1 = QStandardItem(folder.name)
             self.folders_and_files_items.append(parent1)
@@ -545,6 +550,17 @@ class MainWindow(QMainWindow):
     def selection_changed(self, index):
         self.selected_item = index.sibling(index.row(), 0)
         self.change_button.setEnabled(True)
+
+    def eventFilter(self, obj, event):
+        if obj is self.window and event.type() == QEvent.Close:
+            event.accept()
+            Communicate().speak.connect(self.downloads_window.signal_catcher)
+            return True
+        return super(MainWindow, self).eventFilter(obj, event)
+
+
+class Communicate(QObject):
+    speak = Signal(bool)
 
 
 def client_exit():

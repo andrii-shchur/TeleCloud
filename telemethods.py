@@ -136,10 +136,11 @@ class TeleCloudApp:
             messages=msg_objs,
             file_name=os.path.join(self.local_dir, file_folder, file_name),
             progress=self.download_callback,
-            block=False)
+            block=False,
+        progress_total=files.size)
 
     def download_callback(self, client, done, total):
-        pass
+        print(done, total, sep='/')
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):

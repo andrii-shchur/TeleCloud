@@ -647,7 +647,8 @@ class TeleCloudClient(PyrogramClient):
             file_name: str = "",
             block: bool = True,
             progress: callable = None,
-            progress_args: tuple = ()
+            progress_args: tuple = (),
+            progress_total:int=None,
     ) -> Union[str, None]:
         """Use this method to download the media from a message.
 
@@ -760,7 +761,7 @@ class TeleCloudClient(PyrogramClient):
         done = Event()
         path = [None]
 
-        self.download_queue.put((medias, file_name, done, progress, progress_args, path))
+        self.download_queue.put((medias, file_name, done, [progress, progress_total], progress_args, path))
 
         if block:
             done.wait()
@@ -772,17 +773,19 @@ class TeleCloudClient(PyrogramClient):
         log.debug("{} started".format(name))
 
         while True:
-            media = self.download_queue.get()
+            media_queu_item = self.download_queue.get()
 
-            if media is None:
+            if media_queu_item is None:
                 break
 
             temp_file_path = ""
             files = []
+            progress_current = 0
 
             try:
 
-                medias, file_name, done, progress, progress_args, path = media
+                medias, file_name, done, progress, progress_args, path = media_queu_item
+                progress, progress_total = progress
                 directory, file_name = os.path.split(file_name)
                 for media in medias:
                     file_id = media.file_id
@@ -824,12 +827,15 @@ class TeleCloudClient(PyrogramClient):
                             secret=secret,
                             size=size,
                             progress=progress,
-                            progress_args=progress_args
+                            progress_args=progress_args,
+                            progress_current=progress_current,
+                            progress_total=progress_total
                         )
                         if temp_file_path:
                             files.append(temp_file_path)
                         else:
                             raise ValueError('Something wrong with file')
+                        progress_current += const_max_size
                 final_file_path = os.path.abspath(re.sub("\\\\", "/", os.path.join(directory, file_name)))
                 if len(files) > 1:
 
@@ -863,7 +869,9 @@ class TeleCloudClient(PyrogramClient):
                  secret: int = None,
                  size: int = None,
                  progress: callable = None,
-                 progress_args: tuple = ()) -> str:
+                 progress_args: tuple = (),
+                 progress_current: int = 0,
+                 progress_total: int = None) -> str:
         with self.media_sessions_lock:
             session = self.media_sessions.get(dc_id, None)
 
@@ -947,7 +955,10 @@ class TeleCloudClient(PyrogramClient):
                             offset += limit
 
                             if progress:
-                                progress(self, min(offset, size) if size != 0 else offset, size, *progress_args)
+                                progress(self,
+                                         min(progress_current + offset, size) if size != 0 else offset,
+                                         size if not progress_total else progress_total,
+                                         *progress_args)
 
                             r = session.send(
                                 functions.upload.GetFile(
@@ -1035,7 +1046,10 @@ class TeleCloudClient(PyrogramClient):
                                 offset += limit
 
                                 if progress:
-                                    progress(self, min(offset, size) if size != 0 else offset, size, *progress_args)
+                                    progress(self,
+                                             min(progress_current + offset, size) if size != 0 else offset,
+                                             size if not progress_total else progress_total,
+                                             *progress_args)
 
                                 if len(chunk) < limit:
                                     break
