@@ -5,7 +5,7 @@ import pyrogram
 from dbmethods import Session
 import platform
 from separate_gui import phone_number, telegram_code, two_factor_auth, please_wait
-from telecloudutils import split_into_parts, const_max_size
+from telecloudutils import split_into_parts, const_max_size, clean_temp
 from teleclouderrors import FileDuplicateError, FolderMissingError
 from pyrewrite import TeleCloudClient
 import os, tempfile, time, shutil
@@ -126,6 +126,7 @@ class TeleCloudApp:
                     pass
 
     def download_file(self, file_name, file_folder):
+        clean_temp()
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
         msg_objs = self.client.get_messages(
@@ -139,9 +140,10 @@ class TeleCloudApp:
             block=False)
 
     def download_callback(self, client, done, total):
-        print(done, total, sep='/')
+        pass
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
+        clean_temp()
         if not self.db_session.check_folder_exists(to_folder):
             raise FolderMissingError("Missing folder: '{}'".format(to_folder))
         if self.db_session.check_file_exists(file_name, to_folder):

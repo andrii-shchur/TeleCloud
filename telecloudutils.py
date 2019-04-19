@@ -62,3 +62,8 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def clean_temp():
+    import tempfile, shutil
+    for path in os.listdir(tempfile.gettempdir()):
+        shutil.rmtree(os.path.join(tempfile.gettempdir(), path), ignore_errors=True)

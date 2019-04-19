@@ -7,7 +7,7 @@ from PySide2.QtCore import *
 from PySide2.QtGui import *
 from telemethods import TeleCloudApp
 from teleclouderrors import FolderMissingError, FileDuplicateError
-from telecloudutils import resource_path
+from telecloudutils import resource_path, clean_temp
 import gui.logo
 import json
 from separate_gui import Worker
@@ -168,7 +168,6 @@ class UploadForm(QMainWindow):
 
     def check(self):
         thr = self.threadpool.activeThreadCount()
-        print(thr, self.worker)
         if self.worker is not None and thr == 0:
             self.ret = self.worker.ret
             self.window.removeEventFilter(self)
@@ -208,7 +207,6 @@ class UploadForm(QMainWindow):
             self.alert_label.setText('Файл з такою назвою вже існує')
 
     def upload_callback(self, client, current, total):
-        print(current, total, sep='/')
         self.total = total
         self.current = current
         if self.stop_needed:
@@ -221,6 +219,7 @@ class UploadForm(QMainWindow):
     def eventFilter(self, obj, event):
         if obj is self.window and event.type() == QEvent.Close:
             self.stop_needed = True
+            self.alert_label.setText('Зупиняємо завантаження... Зачекайте!')
             event.ignore()
             return True
         return super(UploadForm, self).eventFilter(obj, event)
@@ -576,12 +575,6 @@ def main_window():
     app = get_app_instance()
     mainwindow = MainWindow(resource_path('gui/main.ui'))
     app.exec_()
-
-
-def clean_temp():
-    import tempfile, shutil
-    for path in os.listdir(tempfile.gettempdir()):
-        shutil.rmtree(os.path.join(tempfile.gettempdir(), path), ignore_errors=True)
 
 
 if __name__ == "__main__":
