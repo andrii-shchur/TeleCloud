@@ -46,7 +46,7 @@
       <item>
        <widget class="QPushButton" name="upload_button">
         <property name="text">
-         <string>Завантажити файл</string>
+         <string>Завантажити файли</string>
         </property>
         <property name="icon">
          <iconset>

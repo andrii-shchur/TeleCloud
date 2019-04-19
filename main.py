@@ -117,8 +117,8 @@ class EditFile(QMainWindow):
 
 
 class UploadForm(QMainWindow):
-    def __init__(self, ui_file, file_path, filename):
-        super(UploadForm, self).__init__(parent=None)
+    def __init__(self, ui_file, file_path, filename, parent):
+        super(UploadForm, self).__init__(parent=parent)
         self.file_path = file_path
         self.filename = filename
         ui_file = QFile(resource_path(ui_file))
@@ -346,10 +346,12 @@ class MainWindow(QMainWindow):
             self.upload_handler()
 
     def upload_handler(self):
-        file_path = QFileDialog().getOpenFileName()
-        filename = os.path.basename(file_path[0])
-        if file_path[0] != '':
-            self.__a = UploadForm(resource_path('gui/upload_file_window.ui'), file_path[0], filename)
+        file_path = QFileDialog().getOpenFileNames(self)
+        print(file_path)
+
+        for i in file_path[0]:
+            filename = os.path.basename(i)
+            UploadForm(resource_path('gui/upload_file_window.ui'), i, filename, self)
 
     def folder_handler(self):
         self.folderdialog = FolderDialog(resource_path('gui/create_folder.ui'))
