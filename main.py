@@ -303,22 +303,6 @@ class NewOrExistingChannelForm(QMainWindow):
         self.window.close()
 
 
-class DownloadsWindow(QMainWindow):
-    def __init__(self, ui_file):
-        super(DownloadsWindow, self).__init__(parent=None)
-        ui_file = QFile(resource_path(ui_file))
-        ui_file.open(QFile.ReadOnly)
-
-        loader = QUiLoader()
-        self.window = loader.load(ui_file)
-        self.main_isclosed = False
-        ui_file.close()
-
-    @Slot(bool)
-    def slot_handler(self, boolean):
-        self.main_isclosed = boolean
-
-
 class MainWindow(QMainWindow):
     def __init__(self, ui_file):
         super(MainWindow, self).__init__(parent=None)
@@ -342,13 +326,30 @@ class MainWindow(QMainWindow):
         self.download_button.clicked.connect(self.download)
         self.change_button = self.window.findChild(QPushButton, 'change_button')
         self.change_button.clicked.connect(self.change_button_handler)
+        self.clear_one_button = self.window.findChild(QToolButton, 'toolButton')
+        self.clear_all_button = self.window.findChild(QToolButton, 'toolButton_2')
+        self.clear_one_button.clicked.connect(self.clear_current)
+        self.clear_all_button.clicked.connect(self.stop_all)
+        self.progress_bar = self.window.findChild(QProgressBar, 'downloading_progress_bar')
+        self.downloading_name = self.window.findChild(QLabel, 'downloading_now_label')
+        self.progress_bar.hide()
+        self.clear_all_button.hide()
+        self.clear_one_button.hide()
+        self.downloading_name.hide()
 
         self.upload_button.setIcon(QIcon(resource_path('gui/upload.png')))
         folder_create.setIcon(QIcon(resource_path('gui/new_folder')))
         self.change_button.setIcon(QIcon(resource_path('gui/edit.png')))
         cancel_search_button.setIcon(QIcon(resource_path('gui/cross.png')))
         self.download_button.setIcon(QIcon(resource_path('gui/download.png')))
+        self.clear_all_button.setIcon(QIcon(resource_path('gui/clear_all.png')))
+        self.clear_one_button.setIcon(QIcon(resource_path('gui/clear_current.png')))
 
+        self.stop_needed = False
+        self.downloading_now_flag = False
+        self.total = 1
+        self.current = 0
+        self.downloading_now_filename = ''
         self.folders_and_files_items = []
         self.selected_item = None
         self.latest_folders = connector.db_session.get_folders()
@@ -364,9 +365,33 @@ class MainWindow(QMainWindow):
         self.download_timer.timeout.connect(self.get_checked)
         self.download_timer.setInterval(100)
         self.download_timer.start()
+
+        self.download_progress_timer = QTimer(self)
+        self.download_progress_timer.timeout.connect(self.bar_updater)
+        self.download_progress_timer.setInterval(100)
+        self.download_progress_timer.start()
+
         self.window.installEventFilter(self)
 
         self.window.show()
+
+    def clear_current(self):
+        self.stop_needed = True
+
+    def bar_updater(self):
+        if not connector.client.download_queue.empty() or self.downloading_now_flag:
+            self.downloading_name.setText(self.downloading_now_filename)
+            self.progress_bar.setValue(int((self.current / self.total) * 100))
+            self.clear_one_button.show()
+            self.clear_all_button.show()
+            self.progress_bar.show()
+            self.downloading_name.show()
+        else:
+            self.stop_needed = False
+            self.clear_one_button.hide()
+            self.clear_all_button.hide()
+            self.progress_bar.hide()
+            self.downloading_name.hide()
 
     def folders_exist(self):
         if not connector.db_session.get_folders():
@@ -549,7 +574,7 @@ class MainWindow(QMainWindow):
         for i in self.get_checked():
             file_name, file_folder, item = i
             item.setCheckState(Qt.Unchecked)
-            connector.download_file(file_name, file_folder)
+            connector.download_file(file_name, file_folder, self.download_handler)
 
     def change_button_handler(self):
         if not self.selected_item.parent().data():
@@ -565,10 +590,34 @@ class MainWindow(QMainWindow):
         self.selected_item = index.sibling(index.row(), 0)
         self.change_button.setEnabled(True)
 
+    def download_handler(self, client, current, total, filename):
+        self.downloading_now_filename = filename
+        self.current = current
+        self.total = total
+        self.downloading_now_flag = True
+        if self.stop_needed:
+            self.downloading_now_filename = ''
+            self.downloading_now_flag = False
+            self.stop_needed = False
+            client.stop_transmission()
+
+    def stop_all(self):
+        self.stop_needed = True
+
+        for _ in range(connector.client.DOWNLOAD_WORKERS):
+            connector.client.download_queue.put(None)
+
+        for i in connector.client.download_workers_list:
+            i.join()
+
+        connector.client.download_workers_list.clear()
+        self.downloading_now_flag = False
+
     def eventFilter(self, obj, event):
         if obj is self.window and event.type() == QEvent.Close:
+            self.stop_all()
             event.accept()
-            # Communicate().speak.connect(self.downloads_window.signal_catcher)
+
             return True
         elif obj is self.window and event.type() == QEvent.DragMove:
             event.setDropAction(Qt.CopyAction)
@@ -591,10 +640,6 @@ class MainWindow(QMainWindow):
                     UploadForm(resource_path('gui/upload_file_window.ui'), path, filename, self)
             return True
         return super(MainWindow, self).eventFilter(obj, event)
-
-
-class Communicate(QObject):
-    speak = Signal(bool)
 
 
 def client_exit():
@@ -645,7 +690,7 @@ if __name__ == "__main__":
             new_channel()
         main_window()
     except Exception as e:
-        print(e.__class__, str(e))
+        raise e
         pass
     finally:
         client_exit()

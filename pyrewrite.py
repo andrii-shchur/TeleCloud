@@ -172,7 +172,6 @@ class TeleCloudClient(PyrogramClient):
         self.code_callback: callable = phone_code
         self.password_callback: callable = password
         self.separate_files = []
-        self.download_list_queue = []
 
     def stop(self):
         """Use this method to manually stop the Client.
@@ -759,7 +758,6 @@ class TeleCloudClient(PyrogramClient):
 
         done = Event()
         path = [None]
-        self.download_list_queue.append((medias, file_name, done, [progress, progress_total], progress_args, path))
         self.download_queue.put((medias, file_name, done, [progress, progress_total], progress_args, path))
 
         if block:

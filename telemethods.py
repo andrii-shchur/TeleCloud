@@ -121,7 +121,6 @@ class TeleCloudApp:
                         except PermissionError:
                             time.sleep(1)
                 except pyrogram.errors.FloodWait as e:
-                    print(e)
                     time.sleep(e.x)
                     continue
 
@@ -132,7 +131,7 @@ class TeleCloudApp:
                 except PermissionError:
                     pass
 
-    def download_file(self, file_name, file_folder):
+    def download_file(self, file_name, file_folder, callback):
 
         files = self.db_session.get_file_by_folder(file_name, file_folder)
 
@@ -143,12 +142,11 @@ class TeleCloudApp:
         self.client.download_media(
             messages=msg_objs,
             file_name=os.path.join(self.local_dir, file_folder, file_name),
-            progress=self.download_callback,
+            progress=callback,
             block=False,
-            progress_total=files.size)
+            progress_total=files.size,
+        progress_args=(files.name, ))
 
-    def download_callback(self, client, done, total):
-        print(done, total, sep='/')
 
     def upload_file(self, path, file_name, tags, to_folder, callback):
         if not self.db_session.check_folder_exists(to_folder):
